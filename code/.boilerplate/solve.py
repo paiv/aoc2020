@@ -10,7 +10,9 @@ def solve(text):
 
 def test():
     aoc.test_subject(solve)
-    aoc.test('3 2 1') == 6
+    aoc.test("""
+3 2 1
+""") == 6
 
 
 if __name__ == '__main__':

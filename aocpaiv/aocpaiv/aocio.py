@@ -28,7 +28,7 @@ def read_files(mode='r'):
 
 def parse_ints(s, dtype=int):
     rx = re.compile(r'-?\d+')
-    return [[*map(dtype, n)] for n in map(rx.findall, s.splitlines())]
+    return [[*map(dtype, n)] for n in map(rx.findall, s.lstrip().splitlines())]
 
 
 def parse_ints_flatten(s, dtype=int):
