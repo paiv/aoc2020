@@ -2,6 +2,7 @@
 import os
 import requests
 import shutil
+import signal
 import sys
 import time
 import yaml
@@ -29,6 +30,26 @@ def get(url, cookies=None, ua=None):
             trace(e)
             time.sleep(delay)
             delay *= 1.44
+
+
+def sleep_until(that_moment):
+    def restore_cursor(*args):
+        trace('\x1b[?25h', end='')
+        exit()
+    sig = signal.signal(signal.SIGINT, restore_cursor)
+
+    subsec = 4
+    chars = '▁▃▄▅▆▇█▇▆▅▄▃'
+    while datetime.utcnow() < that_moment:
+        t = int(time.monotonic() * len(chars) / subsec) % len(chars)
+        x = chars[t]
+        trace(f'\x1b[?25l{x}\x1b[D' , end='')
+        time.sleep(1/subsec)
+        trace('\x1b[1K', end='')
+    else:
+        trace('\x1b[?25h', end='')
+
+    signal.signal(signal.SIGINT, sig)
 
 
 def prep(day=None, year=None):
@@ -68,14 +89,7 @@ def prep(day=None, year=None):
     trace(daydir)
 
     that_moment = datetime(year, 12, day, 5)
-    waiting = datetime.utcnow() < that_moment
-
-    while datetime.utcnow() < that_moment:
-        trace('.', end='')
-        time.sleep(1)
-
-    if waiting:
-        trace()
+    sleep_until(that_moment)
 
     problem = get(dayurl, cookies=cookies, ua=user_agent)
 
