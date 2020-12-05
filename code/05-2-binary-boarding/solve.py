@@ -9,8 +9,9 @@ def seatid(s):
 
 
 def encode_seat(seat):
-    a = f'{seat[0]:07b}'.translate(str.maketrans('01', 'FB'))
-    b = f'{seat[1]:03b}'.translate(str.maketrans('01', 'LR'))
+    row, col = divmod(seat, 8)
+    a = f'{row:07b}'.translate(str.maketrans('01', 'FB'))
+    b = f'{col:03b}'.translate(str.maketrans('01', 'LR'))
     return a + b
 
 
@@ -26,7 +27,7 @@ def test():
     aoc.test('FBFBBFFRLR') == 357
 
     aoc.test_subject(encode_seat)
-    aoc.test((44, 5)) == 'FBFBBFFRLR'
+    aoc.test(357) == 'FBFBBFFRLR'
 
 
 if __name__ == '__main__':
