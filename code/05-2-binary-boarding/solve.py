@@ -2,10 +2,10 @@
 import aocpaiv as aoc
 
 
-def parse_seat(s):
+def seatid(s):
     row = sum((1 << i) for i,x in enumerate(reversed(s[:-3])) if x == 'B')
     col = sum((1 << i) for i,x in enumerate(reversed(s[-3:])) if x == 'R')
-    return (row, col)
+    return row * 8 + col
 
 
 def encode_seat(seat):
@@ -15,15 +15,15 @@ def encode_seat(seat):
 
 
 def solve(text):
-    xs = sorted(map(parse_seat, text.splitlines()))
-    for (arow, acol), (brow, bcol) in zip(xs, xs[1:]):
-        if (arow == brow) and (acol + 1 != bcol):
-            return arow * 8 + acol + 1
+    xs = sorted(map(seatid, text.splitlines()))
+    for a, b in zip(xs, xs[1:]):
+        if b - a == 2:
+            return a + 1
 
 
 def test():
-    aoc.test_subject(parse_seat)
-    aoc.test('FBFBBFFRLR') == (44, 5)
+    aoc.test_subject(seatid)
+    aoc.test('FBFBBFFRLR') == 357
 
     aoc.test_subject(encode_seat)
     aoc.test((44, 5)) == 'FBFBBFFRLR'
