@@ -6,7 +6,7 @@ import signal
 import sys
 import time
 import yaml
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -22,7 +22,7 @@ def get(url, cookies=None, ua=None):
     delay = 1
     while True:
         try:
-            r = requests.get(url, headers=headers, cookies=cookies)
+            r = requests.get(url, headers=headers, cookies=cookies, timeout=5)
             r.raise_for_status()
             trace('ok', url)
             return r.content
@@ -34,20 +34,15 @@ def get(url, cookies=None, ua=None):
 
 def sleep_until(that_moment):
     def restore_cursor(*args):
-        trace('\x1b[?25h', end='')
         exit()
     sig = signal.signal(signal.SIGINT, restore_cursor)
 
-    subsec = 4
-    chars = '▁▃▄▅▆▇█▇▆▅▄▃'
-    while datetime.utcnow() < that_moment:
-        t = int(time.monotonic() * len(chars) / subsec) % len(chars)
-        x = chars[t]
-        trace(f'\x1b[?25l{x}\x1b[D' , end='')
+    subsec = 2
+    while (dt := that_moment - datetime.utcnow()) > timedelta():
+        dt = timedelta(seconds=round(dt.total_seconds()))
+        trace(f'{dt} ' , end='')
         time.sleep(1/subsec)
-        trace('\x1b[1K', end='')
-    else:
-        trace('\x1b[?25h', end='')
+        trace('\x1b[1K\x1b[G', end='')
 
     signal.signal(signal.SIGINT, sig)
 
