@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import aocpaiv as aoc
 import re
+from collections import defaultdict
 
 
 def solve(text):
@@ -8,22 +9,21 @@ def solve(text):
         bag, rule = s.split('bags contain')
         return bag.strip(), re.findall(r'\d+ (.*?) bag', rule)
 
-    rules = dict(map(parse_line, text.strip().splitlines()))
+    parents = defaultdict(set)
+    for bag, xs in map(parse_line, text.strip().splitlines()):
+        for inner in xs:
+            parents[inner].add(bag)
 
-    def hasit(bag, goal='shiny gold'):
-        if bag == goal: return False
-        seen = set()
-        fringe = [bag]
-        while fringe:
-            bag = fringe.pop()
-            if bag == goal: return True
-            seen.add(bag)
-            for bag in rules[bag]:
-                if bag not in seen:
-                    fringe.append(bag)
-        return False
+    total = 0
+    fringe = ['shiny gold']
+    nasty = set()
+    while fringe:
+        bag = fringe.pop()
+        for p in parents[bag]:
+            nasty.add(p)
+            fringe.append(p)
 
-    return sum(map(hasit, rules))
+    return len(nasty)
 
 
 def test():
