@@ -44,27 +44,27 @@ function parseRule(line) {
 function parseRules(text) {
     return new Map(text.trim().split('\n').map(parseRule))
 }
-const cy = cytoscape({container: document.getElementById('cy'),
-    style: [
-        {   selector: 'node',
-            style: {
-                label: 'data(id)',
-                width: 16, height: 16
-        }},
-        {   selector: 'edge',
-            style: {
-                width: 1,
-                'curve-style': 'bezier',
-                'label': 'data(n)',
-                'target-arrow-shape': 'triangle',
-        }},
-        ],
-})
 function redraw() {
+    const cy = cytoscape({container: document.getElementById('cy'),
+        style: [
+            {   selector: 'node',
+                style: {
+                    label: 'data(id)',
+                    width: 16, height: 16
+            }},
+            {   selector: 'edge',
+                style: {
+                    width: 1,
+                    'curve-style': 'bezier',
+                    'label': 'data(n)',
+                    'target-arrow-shape': 'triangle',
+            }},
+            ],
+    })
     let rules = parseRules(document.getElementById('rules').value)
-    cy.unmount()
     cy.startBatch()
     for (const [bag, xs] of rules) {
+        if (!bag) continue
         cy.add([
             {group: 'nodes', data: {id: bag}},
         ])
@@ -77,10 +77,9 @@ function redraw() {
         }
     }
     cy.endBatch()
-    cy.mount(document.getElementById('cy'))
     cy.layout({name: 'circle'}).run()
 }
-document.getElementById('rules').addEventListener('change', redraw)
+document.getElementById('rules').addEventListener('input', redraw)
 redraw()
 </script>
 </body>
