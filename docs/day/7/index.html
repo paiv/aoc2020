@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <title></title>
+
+<style media="screen">
+textarea {width: 40em; height: 4em;}
+#cy {
+  width: 100%;
+  height: 600px;
+}
+</style>
+</head>
+<body>
+
+<div>
+    <textarea id='rules'>light red bags contain 1 bright white bag, 2 muted yellow bags.
+dark orange bags contain 3 bright white bags, 4 muted yellow bags.
+bright white bags contain 1 shiny gold bag.
+muted yellow bags contain 2 shiny gold bags, 9 faded blue bags.
+shiny gold bags contain 1 dark olive bag, 2 vibrant plum bags.
+dark olive bags contain 3 faded blue bags, 4 dotted black bags.
+vibrant plum bags contain 5 faded blue bags, 6 dotted black bags.
+faded blue bags contain no other bags.
+dotted black bags contain no other bags.
+</textarea>
+</div>
+
+<div id='cy'>
+</div>
+
+<script src="cytoscape.min.js"></script>
+<script type="text/javascript">
+function parseRule(line) {
+    let [bag, rules] = line.split('bags contain')
+    const rx = /(\d+) (.*?) bag/g
+    let xs = new Array()
+    while ((m = rx.exec(rules)) !== null) {
+        xs.push({n:parseInt(m[1]), bag:m[2]})
+    }
+    return [bag.trim(), xs]
+}
+function parseRules(text) {
+    return new Map(text.trim().split('\n').map(parseRule))
+}
+const cy = cytoscape({container: document.getElementById('cy'),
+    style: [
+        {   selector: 'node',
+            style: {
+                label: 'data(id)',
+                width: 16, height: 16
+        }},
+        {   selector: 'edge',
+            style: {
+                width: 1,
+                'curve-style': 'bezier',
+                'label': 'data(n)',
+                'target-arrow-shape': 'triangle',
+        }},
+        ],
+})
+function redraw() {
+    let rules = parseRules(document.getElementById('rules').value)
+    cy.unmount()
+    cy.startBatch()
+    for (const [bag, xs] of rules) {
+        cy.add([
+            {group: 'nodes', data: {id: bag}},
+        ])
+    }
+    for (const [bag, xs] of rules) {
+        for (const r of xs) {
+            cy.add([
+                {group: 'edges', data: {id: 'e:' + bag + '-' + r.bag, source: bag, target: r.bag, n:r.n}},
+            ])
+        }
+    }
+    cy.endBatch()
+    cy.mount(document.getElementById('cy'))
+    cy.layout({name: 'circle'}).run()
+}
+document.getElementById('rules').addEventListener('change', redraw)
+redraw()
+</script>
+</body>
+</html>
