@@ -1,6 +1,5 @@
 #!/usr/bin/env python -OO
 import aocpaiv as aoc
-import re
 
 
 def run_program(program):
