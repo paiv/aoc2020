@@ -2,6 +2,8 @@ paiv – Advent of Code 2020
 ==
 https://adventofcode.com/2020/
 
+<img src="code/08-1-handheld-halting/pico8.gif" width="256">
+
 
 Visualizations
 --
