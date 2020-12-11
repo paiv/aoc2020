@@ -40,7 +40,7 @@ def sleep_until(that_moment):
     subsec = 2
     while (dt := that_moment - datetime.utcnow()) > timedelta():
         dt = timedelta(seconds=round(dt.total_seconds()))
-        trace(f'{dt} ' , end='')
+        trace(f'T-{dt} ' , end='')
         time.sleep(1/subsec)
         trace('\x1b[1K\x1b[G', end='')
 
