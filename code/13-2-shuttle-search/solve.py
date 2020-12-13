@@ -5,19 +5,16 @@ import aocpaiv as aoc
 def solve(text):
     data = text.strip().splitlines()
     buses = [(int(s), i) for i, s in enumerate(data[1].split(',')) if s != 'x']
-    buses = sorted(buses, reverse=True)
 
-    # slow chinese remainder solver
-    def sieve(off, t, m):
-        if off >= len(buses):
-            return t
-        x, xt = buses[off]
+    # slow chinese remainder solver, sieve
+    buses = sorted(buses, reverse=True)
+    m, mt = buses[0]
+    t = m - mt
+    for x, xt in buses[1:]:
         while (t + xt) % x:
             t += m
-        return sieve(off + 1, t, m * x)
-
-    m, mt = buses[0]
-    return sieve(1, m - mt, m)
+        m *= x
+    return t
 
 
 def test():
