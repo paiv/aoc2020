@@ -6,18 +6,21 @@ import re
 def solve(text):
     mem = dict()
 
-    def masked(x, mask):
-        for i, b in mask:
-            x &= ~(1 << i)
-            x |= (b << i)
-        return x
+    def make_masks(value):
+        ma = mb = 0
+        for i,x in enumerate(reversed(value)):
+            if x == '0':
+                ma |= 1 << i
+            elif x == '1':
+                mb |= 1 << i
+        return ~ma, mb
 
-    for m in re.finditer(r'(?:mask|mem\[(\d+)\]) = ([X\d]+)', text):
-        addr, value = m[1], m[2]
+    for g in re.finditer(r'(?:mask|mem\[(\d+)\]) = ([X\d]+)', text):
+        addr, value = g[1], g[2]
         if addr is None:
-            mask = [(35-i, int(x)) for i,x in enumerate(value) if x in '01']
+            ma, mb = make_masks(value)
         else:
-            mem[int(addr)] = masked(int(value), mask)
+            mem[int(addr)] = int(value) & ma | mb
 
     return sum(mem.values())
 
