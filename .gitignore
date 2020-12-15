@@ -1,4 +1,4 @@
 /.prep
 /.venv*
-
 __pycache__
+.ipynb*
