@@ -15,7 +15,7 @@ def solve(text):
         def reduce():
             if len(stack) > 2:
                 c, b, a = stack[-3:]
-                if isinstance(a, int) and stack[-2] in '+*':
+                if isinstance(a, int) and b in '+*':
                     stack[-3:] = [opcodes[b](c, a)]
                     return True
                 elif a == ')' and c == '(':
