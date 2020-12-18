@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import aocpaiv as aoc
 import io
+import itertools
 
 
 def solve(text, N=6):
@@ -10,12 +11,9 @@ def solve(text, N=6):
         if v == '#'}
 
     def adjacent(k):
-        z, y, x = k
-        for dz in range(-1, 2):
-            for dy in range(-1, 2):
-                for dx in range(-1, 2):
-                    if not (dx == 0 and dy == 0 and dz == 0):
-                        yield (z + dz, y + dy, x + dx)
+        for p in itertools.product((-1, 0, 1), repeat=len(k)):
+            if any(p):
+                yield tuple(a+b for a, b in zip(k, p))
 
     assert len(list(adjacent((1,1,1)))) == 26
 
