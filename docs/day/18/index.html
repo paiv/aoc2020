@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <title>Day 18: Operation Order</title>
+
+<style media="screen">
+:root {--bg:#fff;--fg:#000;}
+@media (prefers-color-scheme:dark) {:root {--bg:#202124;--fg:#f1f3f4;}}
+body, body * {background:var(--bg); color:var(--fg);}
+textarea {width: 20em; height: 40em; white-space:nowrap; overflow:auto;}
+.flx {display:flex;}
+.tc {flex:1;}
+.fm {min-width:8em;}
+.fm button {margin-left: 1em; margin-top: 2em;}
+#gfx {flex:8; height:100%; border:1px solid gray; font-family:monospace; white-space:nowrap; overflow:scroll;}
+@keyframes hi {
+from {background-color:var(--bg);}
+to {background-color:magenta;}
+}
+.hi {animation-name:hi; animation-timing-function:ease-out; animation-duration:2s;}
+</style>
+</head>
+<body>
+
+<div class="flx">
+
+<div class="tc">
+    <textarea id="input">1 + 2 * 3 + 4 * 5 + 6
+1 + (2 * 3) + (4 * (5 + 6))
+2 * 3 + (4 * 5)
+5 + (8 * 3 + 9 + 3 * 4 * 3)
+5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))
+((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2</textarea>
+</div>
+
+<div class="tc fm">
+    <input id="part1" type="radio" name="part" value="1" checked="true">
+    <label for="part1">part&nbsp;1</label>
+    <br>
+    <input id="part2" type="radio" name="part" value="2">
+    <label for="part2">part&nbsp;2</label>
+    <br>
+    <button type="button" name="button">Eval</button>
+</div>
+
+<div id="gfx" class="tc"></div>
+
+</div>
+
+<script type="text/javascript">
+function display(inner) {
+    let content = document.querySelector('#gfx')
+    let prev = content.querySelector('div')
+    if (prev) {
+        content.replaceChild(inner, prev)
+    }
+    else {
+        content.appendChild(inner)
+    }
+}
+function diffExpr(expr1, expr2) {
+    const [text, , ] = expr1
+    const [r, off, end] = expr2
+    let head = text.substring(0, off)
+    let body = text.substring(off, end)
+    let tail = text.substring(end)
+    if (tail.endsWith('.')) { tail = tail.substring(0, tail.length - 1) }
+    let run = document.createElement('div')
+    function span(text, k) {
+        let s = document.createElement('span')
+        if (k) {
+            s.className = k
+        }
+        s.innerText = text
+        run.appendChild(s)
+        return s
+    }
+    if (head.length) { span(head) }
+    if (body.length) { span(body, 'hi') }
+    if (tail.length) { span(tail) }
+    return run
+}
+function renderDiff(expressions, reduced) {
+    let inner = document.createElement('div')
+    let diffs = expressions.map((expr, i) => diffExpr(expr, reduced[i]))
+    for (run of diffs) {
+        inner.appendChild(run)
+    }
+    return inner
+}
+function formatExpr(tokens) {
+    return tokens.map((x) => x[0]).flatMap((x, i) => {
+        let res = [x]
+        if (x !== '(' && i + 1 < tokens.length && tokens[i+1][0] != ')') {
+            res.push(' ')
+        }
+        return res
+    }).join('')
+}
+function reduceStack_part1(stack) {
+    const n = stack.length
+    let goff, gend
+    if (n > 2) {
+        if (stack[n-2][0] === '+' && typeof(stack[n-1][0]) === 'number') {
+            const [x, off, ] = stack[n-3]
+            const [y, , end] = stack[n-1]
+            goff = off; gend = end
+            stack.splice(n-3, 3, [x + y, off, end])
+        }
+        else if (stack[n-2][0] === '*' && typeof(stack[n-1][0]) === 'number') {
+            const [x, off, ] = stack[n-3]
+            const [y, , end] = stack[n-1]
+            goff = off; gend = end
+            stack.splice(n-3, 3, [x * y, off, end])
+        }
+        else if (stack[n-3][0] === '(' && stack[n-1][0] === ')') {
+            const [, off, ] = stack[n-3]
+            const [z, , ] = stack[n-2]
+            const [, , end] = stack[n-1]
+            goff = off; gend = end
+            stack.splice(n-3, 3, [z, off, end])
+        }
+    }
+    if (n != stack.length) {
+        return [goff, gend]
+    }
+}
+function reduceStack_part2(stack) {
+    const n = stack.length
+    let goff, gend
+    if (n > 2) {
+        if (stack[n-2][0] === '+' && typeof(stack[n-1][0]) === 'number') {
+            const [x, off, ] = stack[n-3]
+            const [y, , end] = stack[n-1]
+            goff = off; gend = end
+            stack.splice(n-3, 3, [x + y, off, end])
+        }
+        else if (stack[n-3][0] === '(' && stack[n-1][0] === ')') {
+            const [, off, ] = stack[n-3]
+            const [z, , ] = stack[n-2]
+            const [, , end] = stack[n-1]
+            goff = off; gend = end
+            stack.splice(n-3, 3, [z, off, end])
+        }
+        else if ((stack[n-1][0] === ')' || stack[n-1][0] === '*' || stack[n-1][0] === '.') && stack[n-3][0] === '*') {
+            const [x, off, ] = stack[n-4]
+            const [y, , end] = stack[n-2]
+            goff = off; gend = end
+            stack.splice(n-4, 3, [x * y, off, end])
+        }
+    }
+    else if (n == 2 && stack[n-1][0] === '.') {
+        const [_, off, end] = stack[n-2]
+        goff = off; gend = end
+        stack.pop()
+    }
+    if (n != stack.length) {
+        return [goff, gend]
+    }
+}
+let reduceStack = reduceStack_part1
+function reduceExpr(text) {
+    let stack = Array()
+    const rx = /(\d+)|([+*().])/g
+    function stack1() {
+        if (m = rx.exec(text)) {
+            let off = m.index
+            let end = m.index + m[0].length
+            let token = (m[1] !== undefined) ? Number.parseInt(m[1]) : m[2]
+            stack.push([token, off, end])
+            return true
+        }
+    }
+    while (stack1()) {
+        if (res = reduceStack(stack)) {
+            let [off, end] = res
+            while (stack1()) {}
+            return [formatExpr(stack), off, end]
+        }
+    }
+}
+function reduce(expressions) {
+    let reduced = Array()
+    let havesome = false
+    for (expr of expressions) {
+        if (r = reduceExpr(expr[0])) {
+            reduced.push(r)
+            havesome = true
+        }
+        else {
+            reduced.push([expr[0], 0, 0])
+        }
+    }
+    if (havesome) {
+        return reduced
+    }
+}
+let timer;
+const delay = 2000;
+function eval() {
+    window.clearTimeout(timer)
+    let part = document.querySelector('input[name=part]:checked').value
+    reduceStack = (part == 2) ? reduceStack_part2 : reduceStack_part1
+    const eol = (part == 2) ? '.' : ''
+    let input = document.getElementById('input').value
+    let expressions = input.trim().split(/\n+/).map((s) => [s+eol, 0, s.length])
+    function reduce1() {
+        if (reduced = reduce(expressions)) {
+            let diff = renderDiff(expressions, reduced)
+            display(diff)
+            expressions = reduced
+            timer = window.setTimeout(reduce1, delay)
+        }
+        else {
+            let diff = renderDiff(expressions, expressions)
+            display(diff)
+        }
+    }
+    reduce1()
+}
+document.querySelector('.fm button').addEventListener('click', eval)
+</script>
+</body>
+</html>

@@ -16,7 +16,7 @@ def solve(text):
                 elif a == ')' and c == '(':
                     stack[-3:] = [b]
                     return True
-                elif (a == ')' or a == '.') and c == '*':
+                elif c == '*' and (a == ')' or a == '*' or a == '.'):
                     x = stack[-4]
                     stack[-4:-1] = [x * b]
                     return True
