@@ -32,12 +32,13 @@ def solve(text):
             off += len(m[0])
         return n, off
 
+    rx31 = re.compile(emit(31))
+    rx42 = re.compile(emit(42))
+
     def match8(text, off):
-        rx42 = re.compile(emit(42))
         return repeated_match(rx42, text, off)
 
     def match11(text, off):
-        rx31 = re.compile(emit(31))
         return repeated_match(rx31, text, off)
 
     def match0(text):
