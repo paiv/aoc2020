@@ -11,3 +11,4 @@ Interactive visualizations
 * [Day 7: Handy Haversacks](https://paiv.github.io/aoc2020/day/7/)
 * [Day 12: Rain Risk](https://paiv.github.io/aoc2020/day/12/)
 * [Day 18: Operation Order](https://paiv.github.io/aoc2020/day/18/)
+* [Day 20: Jurassic Jigsaw](https://paiv.github.io/aoc2020/day/20/)

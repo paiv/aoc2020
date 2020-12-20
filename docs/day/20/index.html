@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Day 20: Jurassic Jigsaw</title>
+
+<style media="screen">
+:root {--bg:#fff;--fg:#000;}
+@media (prefers-color-scheme:dark) {:root {--bg:#202124;--fg:#f1f3f4;}}
+body, body * {background:var(--bg); color:var(--fg);}
+textarea {width: 8em; height: 40em;}
+.flx {display:flex;}
+.fm button {margin-left: 1em; margin-top: 2em;}
+.fm p {margin-left:0.5em; line-height:2em; font-family:monospace;}
+.tile {position:absolute;}
+kbd {padding:0.2em 0.4em 0.2em 0.4em; background-color:var(--fg); color:var(--bg); border-radius:0.25em;}
+</style>
+</head>
+<body>
+
+<div class="flx">
+
+<div>
+    <textarea id="input">Tile 2311:
+..##.#..#.
+##..#.....
+#...##..#.
+####.#...#
+##.##.###.
+##...#.###
+.#.#.#..##
+..#....#..
+###...#.#.
+..###..###
+
+Tile 1951:
+#.##...##.
+#.####...#
+.....#..##
+#...######
+.##.#....#
+.###.#####
+###.##.##.
+.###....#.
+..#.#..#.#
+#...##.#..
+
+Tile 1171:
+####...##.
+#..##.#..#
+##.#..#.#.
+.###.####.
+..###.####
+.##....##.
+.#...####.
+#.##.####.
+####..#...
+.....##...
+
+Tile 1427:
+###.##.#..
+.#..#.##..
+.#.##.#..#
+#.#.#.##.#
+....#...##
+...##..##.
+...#.#####
+.#.####.#.
+..#..###.#
+..##.#..#.
+
+Tile 1489:
+##.#.#....
+..##...#..
+.##..##...
+..#...#...
+#####...#.
+#..#.#.#.#
+...#.#.#..
+##.#...##.
+..##.##.##
+###.##.#..
+
+Tile 2473:
+#....####.
+#..#.##...
+#.##..#...
+######.#.#
+.#...#.#.#
+.#########
+.###.#..#.
+########.#
+##...##.#.
+..###.#.#.
+
+Tile 2971:
+..#.#....#
+#...###...
+#.#.###...
+##.##..#..
+.#####..##
+.#..####.#
+#..#.#..#.
+..####.###
+..#.#.###.
+...#.#.#.#
+
+Tile 2729:
+...#.#.#.#
+####.#....
+..#.#.....
+....#..#.#
+.##..##.#.
+.#.####...
+####.#.#..
+##.####...
+##..#.##..
+#.##...##.
+
+Tile 3079:
+#.#.#####.
+.#..######
+..#.......
+######....
+####.#..#.
+.#...#.##.
+#.#####.##
+..#.###...
+..#.......
+..#.###...
+</textarea>
+</div>
+
+<div class="fm">
+    <button type="button" name="button">Play</button>
+    <p><kbd>R</kbd> rotate
+        <br><kbd>F</kbd> flip X
+        <br><kbd>V</kbd> flip Y
+    </p>
+</div>
+
+<div id="gfx">
+</div>
+
+</div>
+
+<script type="text/javascript">
+let selectedTile = undefined
+let canvasScale = 10
+function tileMouseDown(event) {
+    event.preventDefault()
+    const tile = event.target
+    selectedTile = tile
+    const bounds = tile.getBoundingClientRect()
+    const [offX, offY] = [event.clientX - bounds.left, event.clientY - bounds.top]
+    tile.parentNode.appendChild(tile)
+
+    function moveTo(tile, x, y) {
+        const parent = tile.parentNode.getBoundingClientRect()
+        tile.style.left = x - parent.left - offX + 'px'
+        tile.style.top = y - parent.top - offY + 'px'
+    }
+
+    function onMouseMove(event) {
+        event.preventDefault()
+        moveTo(event.target, event.clientX, event.clientY)
+    }
+    function onMouseUp(event) {
+        const tile = event.target
+        moveTo(event.target, event.clientX, event.clientY)
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.removeEventListener('mouseout', onMouseUp)
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    document.addEventListener('mouseout', onMouseUp)
+}
+function onKeyDown(event) {
+    if (selectedTile && !(event.repeat || event.metaKey || event.ctrlKey || event.altKey)) {
+        switch (event.key) {
+        case 'r': {
+            selectedTile.tile = rotateTile(selectedTile.tile, 90)
+            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            }
+            break
+        case 'R': {
+            selectedTile.tile = rotateTile(selectedTile.tile, 270)
+            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            }
+            break
+        case 'f': case 'F': {
+            selectedTile.tile = flipxTile(selectedTile.tile)
+            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            }
+            break
+        case 'v': case 'V': {
+            selectedTile.tile = flipyTile(selectedTile.tile)
+            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            }
+            break
+        }
+    }
+}
+function renderTile(tile, scale=1) {
+    const [w, h] = [tile.xs[0].length, tile.xs.length]
+    let canvas = document.createElement('canvas')
+    let gx = canvas.getContext('2d')
+    gx.canvas.width = w * scale
+    gx.canvas.height = h * scale
+    gx.scale(scale, scale)
+    const theme = {
+        border: '#f535aa',
+        sand: '#0c090a',
+        wave: '#4863a0',
+    }
+    for (const [y, row] of tile.xs.entries()) {
+        for (const [x, c] of row.entries()) {
+            let color = theme.sand
+            if (c) {
+                const border = (y == 0 || x == 0 || y+1 == h || x+1 == w)
+                color = border ? theme.border : theme.wave
+            }
+            gx.fillStyle = color
+            gx.fillRect(x, y, 1, 1)
+        }
+    }
+    return canvas.toDataURL()
+}
+function renderTileImage(tile, scale=1) {
+    let data = renderTile(tile, scale)
+    let im = new Image()
+    im.src = data
+    im.className = 'tile'
+    im.setAttribute('draggable', false)
+    im.style['box-shadow'] = '0 0 ' + (scale-1) + 'px #666'
+    im.addEventListener('mousedown', tileMouseDown)
+    im.tile = tile
+    return im
+}
+function rotateTile(tile, angle) {
+    const side = tile.xs.length
+    let xs = tile.xs
+    for (; angle > 0; angle -= 90) {
+        let data = Array()
+        for (let y = 0; y < side; ++y) {
+            let row = Array()
+            for (let x = side-1; x >= 0; --x) {
+                row.push(xs[x][y])
+            }
+            data.push(row)
+        }
+        xs = data
+    }
+    return {id: tile.id, xs: xs}
+}
+function flipxTile(tile, angle) {
+    const bound = tile.xs.length - 1
+    let xs = tile.xs.map(row => row.map((x, i) => row[bound-i]))
+    return {id: tile.id, xs: xs}
+}
+function flipyTile(tile, angle) {
+    const bound = tile.xs.length - 1
+    let xs = tile.xs.map((row, i) => tile.xs[bound-i])
+    return {id: tile.id, xs: xs}
+}
+function parseTile(s) {
+    let lines = s.trim().split(/\n+/)
+    let id = Number.parseInt(/\d+/.exec(lines[0]))
+    let xs = lines.slice(1).map(s => s.split('').map(x => x === '#' ?1:0))
+    return {id, xs}
+}
+function shuffle(a) {
+    for (let i = a.length-1; i > 0; --i) {
+        const j = (Math.random() * (i + 1) | 0)
+        const t = a[j]
+        a[j] = a[i]
+        a[i] = t
+    }
+}
+function startGame() {
+    document.querySelector('.fm button').blur()
+    let input = document.getElementById('input').value
+    let tiles = input.trim().split(/\n\n/).map(parseTile)
+    shuffle(tiles)
+    const scale = canvasScale
+    const side = Math.sqrt(tiles.length) | 0
+
+    let inner = document.createElement('div')
+    const [inx, iny] = [side * scale * 10, side * scale]
+    for (const tile of tiles) {
+        let im = renderTileImage(tile, scale)
+        inner.appendChild(im)
+        const [y, x] = [Math.random()*iny|0, Math.random()*inx|0]
+        im.style.left = x + 'px'
+        im.style.top = y + 'px'
+    }
+
+    inner.style.position = 'relative'
+    inner.style.left = '2em'
+    let board = document.getElementById('gfx')
+    let prev = board.querySelector('div')
+    if (prev) {
+        board.replaceChild(inner, prev)
+    }
+    else {
+        board.appendChild(inner)
+    }
+
+}
+document.querySelector('.fm button').addEventListener('click', startGame)
+document.addEventListener('keydown', onKeyDown)
+</script>
+</body>
+</html>
