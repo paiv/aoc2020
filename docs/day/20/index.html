@@ -286,6 +286,7 @@ function renderTileImage(tile, scale=1) {
     let im = new Image()
     im.src = data
     im.className = 'tile'
+    im.setAttribute('title', tile.id)
     im.setAttribute('draggable', false)
     im.style['box-shadow'] = '0 0 ' + (scale-1) + 'px #666'
     im.addEventListener('mousedown', tileMouseDown)
