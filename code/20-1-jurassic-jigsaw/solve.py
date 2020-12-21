@@ -1,82 +1,38 @@
 #!/usr/bin/env python
 import aocpaiv as aoc
-import math
 import re
-from collections import namedtuple
-
-
-Tile = namedtuple('Tile', 'n xs')
+from collections import Counter
 
 
 def solve(text):
-    def parse(s):
+    sides = Counter()
+    tiles = dict()
+    for s in text.strip().split('\n\n'):
         h, *xs = s.strip().splitlines()
         n = int(re.findall(r'\d+', h)[0])
         xs = tuple(tuple(int(x == '#') for x in row) for row in xs)
-        return n, Tile(n, xs)
-    tiles = dict(parse(s) for s in text.strip().split('\n\n'))
+        top, bottom = xs[0], xs[-1]
+        left = tuple(row[0] for row in xs)
+        right = tuple(row[-1] for row in xs)
+        sig = [
+            min(packbits(top), packbits(top[::-1])),
+            min(packbits(right), packbits(right[::-1])),
+            min(packbits(bottom), packbits(bottom[::-1])),
+            min(packbits(left), packbits(left[::-1])),
+        ]
+        sides.update(sig)
+        tiles[n] = sig
 
-    def top(tile): return tile.xs[0]
-    def bottom(tile): return tile.xs[-1]
-    def left(tile): return tuple(row[0] for row in tile.xs)
-    def right(tile): return tuple(row[-1] for row in tile.xs)
+    res = 1
+    for n, sig in tiles.items():
+        if sum(sides[x] for x in sig) == 6:
+            res *= n
+    return res
 
-    def drot(tile):
-        return Tile(tile.n, tuple(zip(*tile.xs)))
-    def flipy(tile):
-        return Tile(tile.n, tile.xs[::-1])
-    def flipx(tile):
-        return Tile(tile.n, tuple(row[::-1] for row in tile.xs))
-    def rot(tile):
-        return flipy(drot(tile))
 
-    transops = [
-        lambda tile: tile,
-        lambda tile: rot(tile),
-        lambda tile: rot(rot(tile)),
-        lambda tile: rot(rot(rot(tile))),
-        lambda tile: flipy(tile),
-        lambda tile: rot(flipy(tile)),
-        lambda tile: rot(rot(flipy(tile))),
-        lambda tile: rot(rot(rot(flipy(tile)))),
-    ]
-    def transforms(tile):
-        for op in transops: yield op(tile)
-    def nth(tile, n):
-        return transops[n](tile)
-
-    def fitstl(t, N, W):
-        if N and top(t) != bottom(N): return False
-        if W and left(t) != right(W): return False
-        return True
-
-    def search_arrangement():
-        ntiles = set(tiles.keys())
-        side = int(math.sqrt(len(ntiles)))
-
-        def qry(n, ti):
-            return nth(tiles[n], ti)
-        def fits(path, t):
-            idx = len(path)
-            y, x = divmod(idx, side)
-            left = qry(*path[y*side+(x-1)]) if x > 0 else None
-            top = qry(*path[(y-1)*side+x]) if y > 0 else None
-            return fitstl(t, top, left)
-
-        fringe = [[]]
-        while fringe:
-            path = fringe.pop()
-            if len(path) == len(ntiles):
-                aoc.trace('found', path)
-                ts = [nth(tiles[n], ti) for n,ti in path]
-                return [[ts[y*side+x] for x in range(side)] for y in range(side)]
-            for n in (ntiles - {n for n,_ in path}):
-                for ti, t in enumerate(transforms(tiles[n])):
-                    if fits(path, t):
-                        fringe.append(path + [(n,ti)])
-
-    m = search_arrangement()
-    return m[0][0].n * m[0][-1].n * m[-1][0].n * m[-1][-1].n
+def packbits(xs):
+    w = len(xs)-1
+    return sum((x << (w-i)) for i,x in enumerate(xs))
 
 
 def test():
