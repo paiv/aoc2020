@@ -14,6 +14,7 @@ textarea {width: 8em; height: 40em;}
 .fm button {margin-left: 1em; margin-top: 2em;}
 .fm p {margin-left:0.5em; line-height:2em; font-family:monospace;}
 .tile {position:absolute;}
+.hi {filter:brightness(150%);}
 kbd {padding:0.2em 0.4em 0.2em 0.4em; background-color:var(--fg); color:var(--bg); border-radius:0.25em;}
 </style>
 </head>
@@ -146,37 +147,88 @@ Tile 3079:
 </div>
 
 <script type="text/javascript">
-let selectedTile = undefined
+let selectedTile, selectedOffX, selectedOffY, reselectTime
+let draggingTile, dragDist
 let canvasScale = 10
+function documentMouseDown(event) {
+    if (selectedTile) {
+        selectedTile.classList.remove('hi')
+        selectedTile = undefined
+    }
+}
 function tileMouseDown(event) {
+    if (event.ctrlKey || event.altKey || event.metaKey || event.button) {
+        return
+    }
     event.preventDefault()
+    event.stopPropagation()
+    if (selectedTile) {
+        selectedTile.classList.remove('hi')
+    }
     const tile = event.target
-    selectedTile = tile
+    reselectTime = (selectedTile === event.target) ? Date.now() : undefined
+    selectedTile = draggingTile = tile
+    dragDist = 0
+    selectedTile.classList.add('hi')
     const bounds = tile.getBoundingClientRect()
-    const [offX, offY] = [event.clientX - bounds.left, event.clientY - bounds.top]
+    selectedOffX = event.clientX - bounds.left
+    selectedOffY = event.clientY - bounds.top
     tile.parentNode.appendChild(tile)
 
-    function moveTo(tile, x, y) {
-        const parent = tile.parentNode.getBoundingClientRect()
-        tile.style.left = x - parent.left - offX + 'px'
-        tile.style.top = y - parent.top - offY + 'px'
-    }
-
-    function onMouseMove(event) {
-        event.preventDefault()
-        moveTo(event.target, event.clientX, event.clientY)
-    }
-    function onMouseUp(event) {
-        const tile = event.target
-        moveTo(event.target, event.clientX, event.clientY)
-        document.removeEventListener('mousemove', onMouseMove)
-        document.removeEventListener('mouseup', onMouseUp)
-        document.removeEventListener('mouseout', onMouseUp)
-    }
-
+    let board = document.getElementById('gfx')
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
-    document.addEventListener('mouseout', onMouseUp)
+}
+function moveTo(tile, x, y) {
+    const parent = tile.parentNode.getBoundingClientRect()
+    tile.style.left = x - parent.left - selectedOffX + 'px'
+    tile.style.top = y - parent.top - selectedOffY + 'px'
+}
+
+function onMouseMove(event) {
+    if (draggingTile) {
+        event.preventDefault()
+        event.stopPropagation()
+        dragDist += event.movementX + event.movementY
+        moveTo(draggingTile, event.clientX, event.clientY)
+        if (event.movementX + event.movementY < canvasScale * 2) {
+            let other = collidDet(draggingTile)
+            if (other) {
+                if (snapTo(draggingTile, other, event.movementX, event.movementY)) {
+                    draggingTile = undefined
+                }
+            }
+        }
+    }
+}
+function onMouseUp(event) {
+    if (draggingTile) {
+        moveTo(draggingTile, event.clientX, event.clientY)
+        if ((draggingTile === selectedTile) && (dragDist == 0) && (Date.now() - reselectTime < 240)) {
+            selectedTile.tile = flipxTile(selectedTile.tile)
+            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+        }
+        draggingTile = undefined
+    }
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+}
+let lastWheel = 0
+function onMouseWheel(event) {
+    const now = Date.now()
+    if (now - lastWheel > 240) {
+        lastWheel = now
+        if (event.ctrlKey || event.altKey || event.metaKey) {
+            canvasScale = Math.max(1, canvasScale + (event.deltaY > 1 ? -1 : 1))
+            rebuildTiles()
+        }
+        else if (event.target && event.target.tile) {
+            let im = event.target
+            im.tile = rotateTile(im.tile, (event.deltaY > 1) ? 270 : 90)
+            im.src = renderTile(im.tile, canvasScale)
+        }
+        event.preventDefault()
+    }
 }
 function onKeyDown(event) {
     if (selectedTile && !(event.repeat || event.metaKey || event.ctrlKey || event.altKey)) {
@@ -237,8 +289,15 @@ function renderTileImage(tile, scale=1) {
     im.setAttribute('draggable', false)
     im.style['box-shadow'] = '0 0 ' + (scale-1) + 'px #666'
     im.addEventListener('mousedown', tileMouseDown)
+    im.addEventListener('wheel', onMouseWheel)
     im.tile = tile
     return im
+}
+function rebuildTiles() {
+    let tiles = document.querySelectorAll('#gfx div img')
+    for (const im of tiles) {
+        im.src = renderTile(im.tile, canvasScale)
+    }
 }
 function rotateTile(tile, angle) {
     const side = tile.xs.length
@@ -254,23 +313,45 @@ function rotateTile(tile, angle) {
         }
         xs = data
     }
-    return {id: tile.id, xs: xs}
+    return {id: tile.id, sig: tile.sig, xs: xs}
 }
 function flipxTile(tile, angle) {
     const bound = tile.xs.length - 1
     let xs = tile.xs.map(row => row.map((x, i) => row[bound-i]))
-    return {id: tile.id, xs: xs}
+    return {id: tile.id, sig: tile.sig, xs: xs}
 }
 function flipyTile(tile, angle) {
     const bound = tile.xs.length - 1
     let xs = tile.xs.map((row, i) => tile.xs[bound-i])
-    return {id: tile.id, xs: xs}
+    return {id: tile.id, sig: tile.sig, xs: xs}
 }
+function tileTop(tile) { return tile.xs[0] }
+function tileBottom(tile) { return tile.xs[tile.xs.length-1] }
+function tileLeft(tile) { return tile.xs.map(row => row[0]) }
+function tileRight(tile) { return tile.xs.map(row => row[row.length-1]) }
 function parseTile(s) {
     let lines = s.trim().split(/\n+/)
     let id = Number.parseInt(/\d+/.exec(lines[0]))
     let xs = lines.slice(1).map(s => s.split('').map(x => x === '#' ?1:0))
-    return {id, xs}
+    let tile = {id, xs}
+    tile.sig = [
+        packnum(tileTop(tile)),
+        packnum(reverse(tileTop(tile))),
+        packnum(tileBottom(tile)),
+        packnum(reverse(tileBottom(tile))),
+        packnum(tileLeft(tile)),
+        packnum(reverse(tileLeft(tile))),
+        packnum(tileRight(tile)),
+        packnum(reverse(tileRight(tile))),
+    ]
+    return tile
+}
+function reverse(a) {
+    let b = a.slice(); b.reverse()
+    return b
+}
+function packnum(a) {
+    return a.reduce((acc, x) => (acc << 1) | x)
 }
 function shuffle(a) {
     for (let i = a.length-1; i > 0; --i) {
@@ -280,6 +361,84 @@ function shuffle(a) {
         a[i] = t
     }
 }
+let cpossible = undefined
+function collidAdd(im) {
+    if (!cpossible) {
+        cpossible = new Map()
+    }
+    for (const s of im.tile.sig) {
+        let ts = cpossible.get(s) || Array()
+        ts.push(im)
+        cpossible.set(s, ts)
+    }
+}
+function collidDet(im) {
+    let known = new Set()
+    for (const x of im.tile.sig.flatMap(s => cpossible.get(s))) {
+        known.add(x)
+    }
+    const mybounds = im.getBoundingClientRect()
+    for (const other of known) {
+        if (other === im) { continue }
+        const bounds = other.getBoundingClientRect()
+        if (collidNear(mybounds, bounds)) {
+            const [sa, sb] = collidSidesNear(im, other, mybounds, bounds)
+            if (sa && sb && packnum(sa) == packnum(sb)) {
+                return other
+            }
+        }
+    }
+}
+function collidNear(a, b) {
+    const q = 1.25
+    let dx = ((a.left + a.right) - (b.left + b.right)) / 2
+    let dy = ((a.top + a.bottom) - (b.top + b.bottom)) / 2
+    return (dx * dx + dy * dy) < (a.width * a.height * q)
+}
+function collidSidesNear(aim, bim, a, b) {
+    const q = 0.15 * 2
+    let va, vb
+    let dx = Math.abs((a.left + a.right) - (b.left + b.right))
+    if (dx < a.width * q) {
+        if (a.top + a.height < b.top) {
+            va = tileBottom(aim.tile)
+            vb = tileTop(bim.tile)
+        }
+        else if (b.top + b.height < a.top) {
+            va = tileTop(aim.tile)
+            vb = tileBottom(bim.tile)
+        }
+    }
+    let dy = Math.abs((a.top + a.bottom) - (b.top + b.bottom))
+    if (dy < a.height * q) {
+        if (a.left + a.width < b.left) {
+            va = tileRight(aim.tile)
+            vb = tileLeft(bim.tile)
+        }
+        else if (b.left + b.width < a.left) {
+            va = tileLeft(aim.tile)
+            vb = tileRight(bim.tile)
+        }
+    }
+    return  [va, vb]
+}
+function snapTo(aim, bim, movedX, movedY) {
+    const q = 0.2 * 2
+    const a = aim.getBoundingClientRect()
+    const b = bim.getBoundingClientRect()
+    for (const [ox, oy] of [[b.left-a.width, b.top], [b.left, b.top-a.height], [b.left+b.width, b.top], [b.left, b.top+b.height]]) {
+        const dx = Math.abs(ox - a.left)
+        const dy = Math.abs(oy - a.top)
+        if (dx + dy < a.width * q) {
+            if (dx == dy || (dx > dy && Math.sign(movedX) == Math.sign(dx)) || (dx < dy && Math.sign(movedY) == Math.sign(dy))) {
+                const parent = aim.parentNode.getBoundingClientRect()
+                aim.style.left = ox - parent.left + 'px'
+                aim.style.top = oy - parent.top + 'px'
+                return true
+            }
+        }
+    }
+}
 function startGame() {
     document.querySelector('.fm button').blur()
     let input = document.getElementById('input').value
@@ -287,11 +446,13 @@ function startGame() {
     shuffle(tiles)
     const scale = canvasScale
     const side = Math.sqrt(tiles.length) | 0
+    cpossible = undefined
 
     let inner = document.createElement('div')
     const [inx, iny] = [side * scale * 10, side * scale]
     for (const tile of tiles) {
         let im = renderTileImage(tile, scale)
+        collidAdd(im)
         inner.appendChild(im)
         const [y, x] = [Math.random()*iny|0, Math.random()*inx|0]
         im.style.left = x + 'px'
@@ -310,8 +471,12 @@ function startGame() {
     }
 
 }
-document.querySelector('.fm button').addEventListener('click', startGame)
-document.addEventListener('keydown', onKeyDown)
+function setupApp() {
+    document.querySelector('.fm button').addEventListener('click', startGame)
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('mousedown', documentMouseDown)
+}
+window.addEventListener('DOMContentLoaded', setupApp)
 </script>
 </body>
 </html>
