@@ -3,10 +3,11 @@ import aocpaiv as aoc
 import io
 import math
 import re
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 
 
-Tile = namedtuple('Tile', 'n xs')
+Tile = namedtuple('Tile', 'n xs sig')
+
 Monster = """
 ..................#.
 #....##....##....###
@@ -22,20 +23,85 @@ def solve(text):
         h, *xs = s.strip().splitlines()
         n = int(re.findall(r'\d+', h)[0])
         xs = tuple(tuple(int(x == '#') for x in row) for row in xs)
-        return n, Tile(n, xs)
+        top, bottom = xs[0], xs[-1]
+        left = tuple(row[0] for row in xs)
+        right = tuple(row[-1] for row in xs)
+        sig = (
+            min(packbits(top), packbits(top[::-1])),
+            min(packbits(right), packbits(right[::-1])),
+            min(packbits(bottom), packbits(bottom[::-1])),
+            min(packbits(left), packbits(left[::-1])),
+        )
+        return n, Tile(n, xs, sig)
     tiles = dict(parse(s) for s in text.strip().split('\n\n'))
 
-    def top(tile): return tile.xs[0]
-    def bottom(tile): return tile.xs[-1]
-    def left(tile): return tuple(row[0] for row in tile.xs)
-    def right(tile): return tuple(row[-1] for row in tile.xs)
+    edges = defaultdict(set)
+    for tile in tiles.values():
+        for s in tile.sig:
+            edges[s].add(tile.n)
+
+    side = int(math.sqrt(len(tiles)))
+    grid = [[[None, None] for x in range(side)] for y in range(side)]
+    orient = [[[None, None] for x in range(side)] for y in range(side)]
+    corner = next(t for n, t in tiles.items() if sum(len(edges[x]) for x in t.sig) == 6)
+    grid[0][0] = corner.n
+    down, right = set(), set()
+    y, x = [s for s in corner.sig if len(edges[s]) > 1]
+    down.add(y)
+    right.add(x)
+    orient[0][0] = (None, x, y, None)
+    for y in range(side):
+        for x in range(side):
+            if x > 0:
+                t = tiles[grid[y][x-1]]
+                q, s = next((tiles[q],s) for s in t.sig if s in right for q in edges[s] if q != t.n)
+                grid[y][x] = q.n
+                i = q.sig.index(s)
+                r = q.sig[(i+2)%4]
+                d = q.sig[(i+1)%4]
+                if d in down:
+                    u = d
+                    down.remove(u)
+                    d = q.sig[(i+3)%4]
+                elif len(edges[d]) == 1:
+                    u = d
+                    d = q.sig[(i+3)%4]
+                else:
+                    u = q.sig[(i+3)%4]
+                    down.discard(u)
+                ox = (u, r, d, s)
+                right.remove(s)
+                right.add(r)
+                down.add(d)
+                orient[y][x] = ox
+            elif y > 0:
+                t = tiles[grid[y-1][x]]
+                q, s = next((tiles[q],s) for s in t.sig if s in down for q in edges[s] if q != t.n)
+                grid[y][x] = q.n
+                i = q.sig.index(s)
+                d = q.sig[(i+2)%4]
+                r = q.sig[(i+1)%4]
+                if r in right:
+                    l = r
+                    right.remove(l)
+                    r = q.sig[(i+3)%4]
+                elif len(edges[r]) == 1:
+                    l = r
+                    r = q.sig[(i+3)%4]
+                else:
+                    l = q.sig[(i+3)%4]
+                    right.discard(l)
+                ox = (s, r, d, l)
+                down.remove(s)
+                down.add(d)
+                right.add(r)
+                orient[y][x] = ox
 
     def drot(tile):
-        return Tile(tile.n, tuple(zip(*tile.xs)))
+        return Tile(tile.n, tuple(zip(*tile.xs)), tile.sig[::-1])
     def flipy(tile):
-        return Tile(tile.n, tile.xs[::-1])
-    def flipx(tile):
-        return Tile(tile.n, tuple(row[::-1] for row in tile.xs))
+        sig = (tile.sig[2], tile.sig[1], tile.sig[0], tile.sig[3])
+        return Tile(tile.n, tile.xs[::-1], sig)
     def rot(tile):
         return flipy(drot(tile))
 
@@ -51,53 +117,23 @@ def solve(text):
     ]
     def transforms(tile):
         for op in transops: yield op(tile)
-    def nth(tile, n):
-        return transops[n](tile)
 
-    def fitstl(t, N, W):
-        if N and top(t) != bottom(N): return False
-        if W and left(t) != right(W): return False
-        return True
-
-    def search_arrangement():
-        ntiles = set(tiles.keys())
-        side = int(math.sqrt(len(ntiles)))
-
-        def qry(n, ti):
-            return nth(tiles[n], ti)
-        def fits(path, t):
-            idx = len(path)
-            y, x = divmod(idx, side)
-            left = qry(*path[y*side+(x-1)]) if x > 0 else None
-            top = qry(*path[(y-1)*side+x]) if y > 0 else None
-            return fitstl(t, top, left)
-
-        fringe = [[]]
-        while fringe:
-            path = fringe.pop()
-            if len(path) == len(ntiles):
-                aoc.trace('found', path)
-                ts = [nth(tiles[n], ti) for n,ti in path]
-                return [[ts[y*side+x] for x in range(side)] for y in range(side)]
-            for n in (ntiles - {n for n,_ in path}):
-                for ti, t in enumerate(transforms(tiles[n])):
-                    if fits(path, t):
-                        fringe.append(path + [(n,ti)])
-
-    m = search_arrangement()
-
-    def pack_image(grid):
+    def pack_image(grid, orient):
         side = len(grid)
-        tile_size = len(grid[0][0].xs) - 2
+        tile_size = len(tiles[grid[0][0]].xs) - 2
         pxside = side * tile_size
         def pix(px, py):
             gy, y = divmod(py, tile_size)
             gx, x = divmod(px, tile_size)
-            t = grid[gy][gx]
-            return t.xs[y+1][x+1]
+            n = grid[gy][gx]
+            ox = orient[gy][gx]
+            t = tiles[n]
+            for q in transforms(t):
+                if q.sig[1:3] == ox[1:3]:
+                    return q.xs[y+1][x+1]
         return [[pix(px, py) for px in range(pxside)] for py in range(pxside)]
 
-    pic = pack_image(m)
+    pic = pack_image(grid, orient)
 
     def find_monsters(pic):
         mw = max(x for y,x in monster) + 1
@@ -111,11 +147,16 @@ def solve(text):
     def count_monsters(pic):
         return sum(1 for _ in find_monsters(pic))
 
-    for t in transforms(Tile(0, pic)):
+    for t in transforms(Tile(0, pic, sig=(0,0,0,0))):
         monsters = set(find_monsters(t.xs))
         if monsters:
             aoc.trace(ink(pic, monsters))
             return sum(x for row in t.xs for x in row) - len(monsters) * len(monster)
+
+
+def packbits(xs):
+    w = len(xs)-1
+    return sum((x << (w-i)) for i,x in enumerate(xs))
 
 
 def ink(pic, monsters=None):

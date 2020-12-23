@@ -5,7 +5,7 @@ from collections import Counter
 
 
 def solve(text):
-    sides = Counter()
+    edges = Counter()
     tiles = dict()
     for s in text.strip().split('\n\n'):
         h, *xs = s.strip().splitlines()
@@ -20,12 +20,12 @@ def solve(text):
             min(packbits(bottom), packbits(bottom[::-1])),
             min(packbits(left), packbits(left[::-1])),
         ]
-        sides.update(sig)
+        edges.update(sig)
         tiles[n] = sig
 
     res = 1
     for n, sig in tiles.items():
-        if sum(sides[x] for x in sig) == 6:
+        if sum(edges[x] for x in sig) == 6:
             res *= n
     return res
 
