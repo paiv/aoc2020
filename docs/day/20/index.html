@@ -13,7 +13,8 @@ textarea {width: 8em; height: 40em;}
 .flx {display:flex;}
 .fm button {margin-left: 1em; margin-top: 2em;}
 .fm p {margin-left:0.5em; line-height:2em; font-family:monospace;}
-.tile {position:absolute;}
+.tile {position:absolute; padding:0; margin:0;}
+.tile img {display:block; padding:0; margin:0;}
 .hi {filter:brightness(150%);}
 kbd {padding:0.2em 0.4em 0.2em 0.4em; background-color:var(--fg); color:var(--bg); border-radius:0.25em;}
 </style>
@@ -160,29 +161,29 @@ function tileMouseDown(event) {
     if (event.ctrlKey || event.altKey || event.metaKey || event.button) {
         return
     }
+    const view = event.target.parentNode
     event.preventDefault()
     event.stopPropagation()
     if (selectedTile) {
         selectedTile.classList.remove('hi')
     }
-    const tile = event.target
-    reselectTime = (selectedTile === event.target) ? Date.now() : undefined
-    selectedTile = draggingTile = tile
+    reselectTime = (selectedTile === view) ? Date.now() : undefined
+    selectedTile = draggingTile = view
     dragDist = 0
     selectedTile.classList.add('hi')
-    const bounds = tile.getBoundingClientRect()
+    const bounds = view.getBoundingClientRect()
     selectedOffX = event.clientX - bounds.left
     selectedOffY = event.clientY - bounds.top
-    tile.parentNode.appendChild(tile)
+    view.parentNode.appendChild(view)
 
     let board = document.getElementById('gfx')
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
 }
-function moveTo(tile, x, y) {
-    const parent = tile.parentNode.getBoundingClientRect()
-    tile.style.left = x - parent.left - selectedOffX + 'px'
-    tile.style.top = y - parent.top - selectedOffY + 'px'
+function moveTo(view, x, y) {
+    const parent = view.parentNode.getBoundingClientRect()
+    view.style.left = x - parent.left - selectedOffX + 'px'
+    view.style.top = y - parent.top - selectedOffY + 'px'
 }
 
 function onMouseMove(event) {
@@ -206,7 +207,7 @@ function onMouseUp(event) {
         moveTo(draggingTile, event.clientX, event.clientY)
         if ((draggingTile === selectedTile) && (dragDist == 0) && (Date.now() - reselectTime < 240)) {
             selectedTile.tile = flipxTile(selectedTile.tile)
-            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            refreshTileImage(selectedTile)
         }
         draggingTile = undefined
     }
@@ -222,10 +223,11 @@ function onMouseWheel(event) {
             canvasScale = Math.max(1, canvasScale + (event.deltaY > 1 ? -1 : 1))
             rebuildTiles()
         }
-        else if (event.target && event.target.tile) {
-            let im = event.target
-            im.tile = rotateTile(im.tile, (event.deltaY > 1) ? 270 : 90)
-            im.src = renderTile(im.tile, canvasScale)
+        else if (event.target && event.target.parentNode.tile) {
+            console.log(event)
+            let view = event.target.parentNode
+            view.tile = rotateTile(view.tile, (event.deltaY > 1) ? 270 : 90)
+            refreshTileImage(view)
         }
         event.preventDefault()
     }
@@ -235,28 +237,28 @@ function onKeyDown(event) {
         switch (event.key) {
         case 'r': {
             selectedTile.tile = rotateTile(selectedTile.tile, 90)
-            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            refreshTileImage(selectedTile)
             }
             break
         case 'R': {
             selectedTile.tile = rotateTile(selectedTile.tile, 270)
-            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            refreshTileImage(selectedTile)
             }
             break
         case 'f': case 'F': {
             selectedTile.tile = flipxTile(selectedTile.tile)
-            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            refreshTileImage(selectedTile)
             }
             break
         case 'v': case 'V': {
             selectedTile.tile = flipyTile(selectedTile.tile)
-            selectedTile.src = renderTile(selectedTile.tile, canvasScale)
+            refreshTileImage(selectedTile)
             }
             break
         }
     }
 }
-function renderTile(tile, scale=1) {
+function renderTileImage(tile, scale=1) {
     const [w, h] = [tile.xs[0].length, tile.xs.length]
     let canvas = document.createElement('canvas')
     let gx = canvas.getContext('2d')
@@ -281,23 +283,30 @@ function renderTile(tile, scale=1) {
     }
     return canvas.toDataURL()
 }
-function renderTileImage(tile, scale=1) {
-    let data = renderTile(tile, scale)
+function renderTile(tile, scale=1) {
+    let data = renderTileImage(tile, scale)
     let im = new Image()
     im.src = data
-    im.className = 'tile'
-    im.setAttribute('title', tile.id)
     im.setAttribute('draggable', false)
-    im.style['box-shadow'] = '0 0 ' + (scale-1) + 'px #666'
-    im.addEventListener('mousedown', tileMouseDown)
-    im.addEventListener('wheel', onMouseWheel)
-    im.tile = tile
-    return im
+    let view = document.createElement('div')
+    view.tile = tile
+    view.className = 'tile'
+    view.setAttribute('title', tile.id)
+    view.style['box-shadow'] = '0 0 ' + (scale-1) + 'px #666'
+    view.appendChild(im)
+    view.addEventListener('mousedown', tileMouseDown)
+    view.addEventListener('wheel', onMouseWheel)
+    return view
+}
+function refreshTileImage(view) {
+    let data = renderTileImage(view.tile, canvasScale)
+    let im = view.querySelector('img')
+    im.src = data
 }
 function rebuildTiles() {
-    let tiles = document.querySelectorAll('#gfx div img')
-    for (const im of tiles) {
-        im.src = renderTile(im.tile, canvasScale)
+    let tiles = document.querySelectorAll('#gfx div .tile')
+    for (const view of tiles) {
+        refreshTileImage(view)
     }
 }
 function rotateTile(tile, angle) {
@@ -363,27 +372,27 @@ function shuffle(a) {
     }
 }
 let cpossible = undefined
-function collidAdd(im) {
+function collidAdd(view) {
     if (!cpossible) {
         cpossible = new Map()
     }
-    for (const s of im.tile.sig) {
+    for (const s of view.tile.sig) {
         let ts = cpossible.get(s) || Array()
-        ts.push(im)
+        ts.push(view)
         cpossible.set(s, ts)
     }
 }
-function collidDet(im) {
+function collidDet(view) {
     let known = new Set()
-    for (const x of im.tile.sig.flatMap(s => cpossible.get(s))) {
+    for (const x of view.tile.sig.flatMap(s => cpossible.get(s))) {
         known.add(x)
     }
-    const mybounds = im.getBoundingClientRect()
+    const mybounds = view.getBoundingClientRect()
     for (const other of known) {
-        if (other === im) { continue }
+        if (other === view) { continue }
         const bounds = other.getBoundingClientRect()
         if (collidNear(mybounds, bounds)) {
-            const [sa, sb] = collidSidesNear(im, other, mybounds, bounds)
+            const [sa, sb] = collidSidesNear(view, other, mybounds, bounds)
             if (sa && sb && packnum(sa) == packnum(sb)) {
                 return other
             }
@@ -396,45 +405,45 @@ function collidNear(a, b) {
     let dy = ((a.top + a.bottom) - (b.top + b.bottom)) / 2
     return (dx * dx + dy * dy) < (a.width * a.height * q)
 }
-function collidSidesNear(aim, bim, a, b) {
+function collidSidesNear(aview, bview, a, b) {
     const q = 0.15 * 2
     let va, vb
     let dx = Math.abs((a.left + a.right) - (b.left + b.right))
     if (dx < a.width * q) {
         if (a.top + a.height < b.top) {
-            va = tileBottom(aim.tile)
-            vb = tileTop(bim.tile)
+            va = tileBottom(aview.tile)
+            vb = tileTop(bview.tile)
         }
         else if (b.top + b.height < a.top) {
-            va = tileTop(aim.tile)
-            vb = tileBottom(bim.tile)
+            va = tileTop(aview.tile)
+            vb = tileBottom(bview.tile)
         }
     }
     let dy = Math.abs((a.top + a.bottom) - (b.top + b.bottom))
     if (dy < a.height * q) {
         if (a.left + a.width < b.left) {
-            va = tileRight(aim.tile)
-            vb = tileLeft(bim.tile)
+            va = tileRight(aview.tile)
+            vb = tileLeft(bview.tile)
         }
         else if (b.left + b.width < a.left) {
-            va = tileLeft(aim.tile)
-            vb = tileRight(bim.tile)
+            va = tileLeft(aview.tile)
+            vb = tileRight(bview.tile)
         }
     }
     return  [va, vb]
 }
-function snapTo(aim, bim, movedX, movedY) {
+function snapTo(aview, bview, movedX, movedY) {
     const q = 0.2 * 2
-    const a = aim.getBoundingClientRect()
-    const b = bim.getBoundingClientRect()
+    const a = aview.getBoundingClientRect()
+    const b = bview.getBoundingClientRect()
     for (const [ox, oy] of [[b.left-a.width, b.top], [b.left, b.top-a.height], [b.left+b.width, b.top], [b.left, b.top+b.height]]) {
         const dx = Math.abs(ox - a.left)
         const dy = Math.abs(oy - a.top)
         if (dx + dy < a.width * q) {
             if (dx == dy || (dx > dy && Math.sign(movedX) == Math.sign(dx)) || (dx < dy && Math.sign(movedY) == Math.sign(dy))) {
-                const parent = aim.parentNode.getBoundingClientRect()
-                aim.style.left = ox - parent.left + 'px'
-                aim.style.top = oy - parent.top + 'px'
+                const parent = aview.parentNode.getBoundingClientRect()
+                aview.style.left = ox - parent.left + 'px'
+                aview.style.top = oy - parent.top + 'px'
                 return true
             }
         }
@@ -449,15 +458,25 @@ function startGame() {
     const side = Math.sqrt(tiles.length) | 0
     cpossible = undefined
 
+    const solution0 = 0
+
     let inner = document.createElement('div')
     const [inx, iny] = [side * scale * 10, side * scale]
     for (const tile of tiles) {
-        let im = renderTileImage(tile, scale)
-        collidAdd(im)
-        inner.appendChild(im)
-        const [y, x] = [Math.random()*iny|0, Math.random()*inx|0]
-        im.style.left = x + 'px'
-        im.style.top = y + 'px'
+        let view = renderTile(tile, scale)
+        collidAdd(view)
+        inner.appendChild(view)
+        let x, y
+        if (solution0) {
+            const i = solution0.indexOf(tile.id)
+            x = (i % side) * (tile.xs[0].length + 1) * scale
+            y = (i / side | 0) * (tile.xs.length + 1) * scale
+        }
+        else {
+            [y, x] = [Math.random()*iny|0, Math.random()*inx|0]
+        }
+        view.style.left = x + 'px'
+        view.style.top = y + 'px'
     }
 
     inner.style.position = 'relative'
