@@ -4,18 +4,17 @@ import re
 
 
 def solve(text, N=100):
-    moves = ({'w':-1, 'e':1, 'nw':-1j, 'ne':1-1j, 'sw':1j, 'se':1+1j},
-        {'w':-1, 'e':1, 'nw':-1-1j, 'ne':-1j, 'sw':-1+1j, 'se':1j})
+    moves = {'w':-1, 'e':1, 'nw':-1j, 'ne':1-1j, 'sw':-1+1j, 'se':1j}
 
     grid = dict()
     for line in text.strip().splitlines():
         p = 0
         for op in re.findall(r'se|sw|ne|nw|e|w', line):
-            p += moves[int(p.imag) % 2][op]
+            p += moves[op]
         grid[p] = 1 - grid.get(p, 0)
 
     def adjacent(p):
-        for x in moves[int(p.imag) % 2].values():
+        for x in moves.values():
             yield p + x
 
     def update(grid):
