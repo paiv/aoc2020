@@ -3,20 +3,31 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAATUlEQVRIS2NkoDFgpLH5DKMWEAzh0SCiPIj+L9P/j88UxqiLeIOZYByMWjAaRAwDn4q+mq7Cm865T4cRjCe8+WTUAkKFEeNoEA14EAEArG1AGaK7594AAAAASUVORK5CYII=">
     <title>Day 20: Jurassic Jigsaw</title>
 
 <style media="screen">
-:root {--bg:#fff;--fg:#000;}
+:root {--bg:#fff; --fg:#000;}
 @media (prefers-color-scheme:dark) {:root {--bg:#202124;--fg:#f1f3f4;}}
 body, body * {background:var(--bg); color:var(--fg);}
 textarea {width: 8em; height: 40em;}
+#gfx {user-select:none;}
 .flx {display:flex;}
 .fm button {margin-left: 1em; margin-top: 2em;}
 .fm p {margin-left:0.5em; line-height:2em; font-family:monospace;}
-.tile {position:absolute; padding:0; margin:0;}
-.tile img {display:block; padding:0; margin:0;}
-.hi {filter:brightness(150%);}
+.tg {position:absolute; padding:0; margin:0; background:none; pointer-events:none; transition:transform 0.25s;}
+.tile {display:block; position:absolute; padding:0; margin:0; pointer-events:auto;}
+.mg {position:absolute; padding:0; margin:0; background:none; pointer-events:none;}
+.mm {display:block; padding:0; margin:0; background:none; pointer-events:auto;}
+.hi img {filter:brightness(150%);}
 kbd {padding:0.2em 0.4em 0.2em 0.4em; background-color:var(--fg); color:var(--bg); border-radius:0.25em;}
+.score {display:none; font-family:monospace; user-select:text;}
+.score img {margin-right:0.4em;}
+@keyframes fadeo {to {opacity:0;}} .fadeo {animation:0.35s forwards fadeo;}
+@keyframes fade2 {to {opacity:0;}} .fade2 {animation:0.05s 1s forwards fade2;}
+.anm {transition:left 1s, top 1s;}
+.o0 {opacity:0;}
+.o1 {transition:opacity 0s 0.98s; opacity:1;}
 </style>
 </head>
 <body>
@@ -148,71 +159,139 @@ Tile 3079:
 </div>
 
 <script type="text/javascript">
-let selectedTile, selectedOffX, selectedOffY, reselectTime
-let draggingTile, dragDist
+function m4id() {
+    return [1, 1, 0]
+}
+function m4s(q) {
+    const [sx, sy, ra] = q
+    let so = 'rotateZ('+ ra + 'deg) scale('+ sx + ',' + sy +')'
+    return so
+}
+function m4rotz(q, angle) {
+    const [sx, sy, ra] = q
+    return [sx, sy, ra + angle]
+}
+function m4flip(q, xy) {
+    const [sx, sy, ra] = q
+    const tx = (ra % 180) ? -xy : xy
+    return [tx * sx, -tx * sy, ra]
+}
+function m4getra(q) {
+    return q[2]
+}
+let selectedGroup, selectedOffX, selectedOffY, reselectTime
+let draggingGroup, dragDist
 let canvasScale = 10
+let gamePhase = 1
 function documentMouseDown(event) {
-    if (selectedTile) {
-        selectedTile.classList.remove('hi')
-        selectedTile = undefined
+    if (selectedGroup) {
+        selectedGroup.classList.remove('hi')
+        selectedGroup = undefined
     }
 }
 function tileMouseDown(event) {
     if (event.ctrlKey || event.altKey || event.metaKey || event.button) {
         return
     }
-    const view = event.target.parentNode
+    const group = event.target.closest('div')
     event.preventDefault()
     event.stopPropagation()
-    if (selectedTile) {
-        selectedTile.classList.remove('hi')
+    if (selectedGroup) {
+        selectedGroup.classList.remove('hi')
     }
-    reselectTime = (selectedTile === view) ? Date.now() : undefined
-    selectedTile = draggingTile = view
+    reselectTime = (selectedGroup === group) ? Date.now() : undefined
+    selectedGroup = draggingGroup = group
     dragDist = 0
-    selectedTile.classList.add('hi')
-    const bounds = view.getBoundingClientRect()
-    selectedOffX = event.clientX - bounds.left
-    selectedOffY = event.clientY - bounds.top
-    view.parentNode.appendChild(view)
-
-    let board = document.getElementById('gfx')
+    selectedGroup.classList.add('hi')
+    const r = group.getBoundingClientRect()
+    if (m4getra(group.m) % 180) {
+        selectedOffX = event.clientX - r.left + (r.bottom - r.top) / 2 - (r.right - r.left) / 2
+        selectedOffY = event.clientY - r.top + (r.right - r.left) / 2 - (r.bottom - r.top) / 2
+    }
+    else {
+        selectedOffX = event.clientX - r.left
+        selectedOffY = event.clientY - r.top
+    }
+    group.parentNode.appendChild(group)
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
 }
 function moveTo(view, x, y) {
     const parent = view.parentNode.getBoundingClientRect()
-    view.style.left = x - parent.left - selectedOffX + 'px'
-    view.style.top = y - parent.top - selectedOffY + 'px'
+    view.style.left = (x - parent.left - selectedOffX) + 'px'
+    view.style.top = (y - parent.top - selectedOffY) + 'px'
 }
-
 function onMouseMove(event) {
-    if (draggingTile) {
+    if (draggingGroup) {
         event.preventDefault()
         event.stopPropagation()
         dragDist += event.movementX + event.movementY
-        moveTo(draggingTile, event.clientX, event.clientY)
+        moveTo(draggingGroup, event.clientX, event.clientY)
         if (event.movementX + event.movementY < canvasScale * 2) {
-            let other = collidDet(draggingTile)
-            if (other) {
-                if (snapTo(draggingTile, other, event.movementX, event.movementY)) {
-                    draggingTile = undefined
+            const collidingPair = collidDetGroup(draggingGroup)
+            if (collidingPair) {
+                const [draggingTile, otherTile] = collidingPair
+                if (snapTo(draggingTile, otherTile, event.movementX, event.movementY)) {
+                    const other = otherTile.closest('div')
+                    selectedGroup = mergeGroups(draggingGroup, other)
+                    selectedGroup.classList.add('hi')
+                    draggingGroup = undefined
+                    checkStatePart2()
                 }
             }
         }
     }
 }
 function onMouseUp(event) {
-    if (draggingTile) {
-        moveTo(draggingTile, event.clientX, event.clientY)
-        if ((draggingTile === selectedTile) && (dragDist == 0) && (Date.now() - reselectTime < 240)) {
-            selectedTile.tile = flipxTile(selectedTile.tile)
-            refreshTileImage(selectedTile)
+    if (draggingGroup) {
+        moveTo(draggingGroup, event.clientX, event.clientY)
+        if ((draggingGroup === selectedGroup) && (dragDist == 0) && (Date.now() - reselectTime < 240)) {
+            flipView(selectedGroup, false)
         }
-        draggingTile = undefined
+        draggingGroup = undefined
     }
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
+}
+function monsterMouseDown(event) {
+    if (event.ctrlKey || event.altKey || event.metaKey || event.button) {
+        return
+    }
+    const group = event.target.closest('div')
+    event.preventDefault()
+    event.stopPropagation()
+    if (selectedGroup) {
+        selectedGroup.classList.remove('hi')
+    }
+    selectedGroup = draggingGroup = group
+    const bounds = group.getBoundingClientRect()
+    selectedOffX = event.clientX - bounds.left
+    selectedOffY = event.clientY - bounds.top
+    group.parentNode.appendChild(group)
+    document.addEventListener('mousemove', monsterMouseMove)
+    document.addEventListener('mouseup', monsterMouseUp)
+}
+function monsterMouseMove(event) {
+    if (draggingGroup) {
+        event.preventDefault()
+        event.stopPropagation()
+        moveTo(draggingGroup, event.clientX, event.clientY)
+        if ((gamePhase == 2) && (event.movementX + event.movementY < canvasScale * 2)) {
+            const other = document.querySelector('#gfx .brd div[class~="tg"]')
+            const pos = probeMonster(draggingGroup, other)
+            if (pos) {
+                highlightMonster(draggingGroup, other, pos)
+            }
+        }
+    }
+}
+function monsterMouseUp(event) {
+    if (draggingGroup) {
+        moveTo(draggingGroup, event.clientX, event.clientY)
+        draggingGroup = undefined
+    }
+    document.removeEventListener('mousemove', monsterMouseMove)
+    document.removeEventListener('mouseup', monsterMouseUp)
 }
 let lastWheel = 0
 function onMouseWheel(event) {
@@ -220,40 +299,44 @@ function onMouseWheel(event) {
     if (now - lastWheel > 240) {
         lastWheel = now
         if (event.ctrlKey || event.altKey || event.metaKey) {
-            canvasScale = Math.max(1, canvasScale + (event.deltaY > 1 ? -1 : 1))
-            rebuildTiles()
         }
-        else if (event.target && event.target.parentNode.tile) {
-            console.log(event)
-            let view = event.target.parentNode
-            view.tile = rotateTile(view.tile, (event.deltaY > 1) ? 270 : 90)
-            refreshTileImage(view)
+        else if (event.target) {
+            const group = event.target.closest('div[class~="tg"]')
+            if (group) {
+                rotateView(group, (event.deltaY > 0) ? -90 : 90)
+            }
         }
-        event.preventDefault()
     }
 }
+function rotateView(group, angle) {
+    for (const im of group.querySelectorAll('img[class~="tile"]')) {
+        im.tile = rotateTile(im.tile, angle)
+    }
+    group.m = m4rotz(group.m, angle)
+    group.style.transform = m4s(group.m)
+}
+function flipView(group, flipy) {
+    const flip = (flipy ? flipyTile : flipxTile)
+    for (const im of group.querySelectorAll('img[class~="tile"]')) {
+        im.tile = flip(im.tile)
+    }
+    group.m = m4flip(group.m, flipy ? 1 : -1)
+    group.style.transform = m4s(group.m)
+}
 function onKeyDown(event) {
-    if (selectedTile && !(event.repeat || event.metaKey || event.ctrlKey || event.altKey)) {
+    if (selectedGroup && !(event.repeat || event.metaKey || event.ctrlKey || event.altKey)) {
         switch (event.key) {
-        case 'r': {
-            selectedTile.tile = rotateTile(selectedTile.tile, 90)
-            refreshTileImage(selectedTile)
-            }
+        case 'r':
+            rotateView(selectedGroup, 90)
             break
-        case 'R': {
-            selectedTile.tile = rotateTile(selectedTile.tile, 270)
-            refreshTileImage(selectedTile)
-            }
+        case 'R':
+            rotateView(selectedGroup, -90)
             break
-        case 'f': case 'F': {
-            selectedTile.tile = flipxTile(selectedTile.tile)
-            refreshTileImage(selectedTile)
-            }
+        case 'f': case 'F':
+            flipView(selectedGroup, false)
             break
-        case 'v': case 'V': {
-            selectedTile.tile = flipyTile(selectedTile.tile)
-            refreshTileImage(selectedTile)
-            }
+        case 'v': case 'V':
+            flipView(selectedGroup, true)
             break
         }
     }
@@ -269,50 +352,68 @@ function renderTileImage(tile, scale=1) {
         border: '#f535aa',
         sand: '#0c090a',
         wave: '#4863a0',
+        monster: '#fefcff',
     }
+    const border = tile.border
+    const monsterPixels = tile.mons || new Set()
     for (const [y, row] of tile.xs.entries()) {
         for (const [x, c] of row.entries()) {
             let color = theme.sand
             if (c) {
-                const border = (y == 0 || x == 0 || y+1 == h || x+1 == w)
-                color = border ? theme.border : theme.wave
+                const isborder = (y < border || x < border || y+border >= h || x+border >= w)
+                const ismons = monsterPixels.has(y * 1000 + x)
+                color = isborder ? theme.border : (ismons ? theme.monster : theme.wave)
             }
             gx.fillStyle = color
             gx.fillRect(x, y, 1, 1)
         }
     }
-    return canvas.toDataURL()
+    return [canvas.toDataURL(), w * scale, h * scale]
 }
 function renderTile(tile, scale=1) {
-    let data = renderTileImage(tile, scale)
+    let [data, w, h] = renderTileImage(tile, scale)
     let im = new Image()
+    im.tile = tile
     im.src = data
+    im.className = 'tile'
     im.setAttribute('draggable', false)
-    let view = document.createElement('div')
-    view.tile = tile
-    view.className = 'tile'
-    view.setAttribute('title', tile.id)
-    view.style['box-shadow'] = '0 0 ' + (scale-1) + 'px #666'
-    view.appendChild(im)
-    view.addEventListener('mousedown', tileMouseDown)
-    view.addEventListener('wheel', onMouseWheel)
-    return view
+    im.setAttribute('title', tile.id)
+    im.style['box-shadow'] = '0 0 ' + (scale-1) + 'px #666'
+    return [im, w, h]
 }
-function refreshTileImage(view) {
-    let data = renderTileImage(view.tile, canvasScale)
-    let im = view.querySelector('img')
-    im.src = data
+function renderSingle(tile, scale=1) {
+    const [im, w, h] = renderTile(tile, scale)
+    im.addEventListener('mousedown', tileMouseDown)
+    im.addEventListener('wheel', onMouseWheel)
+    let group = document.createElement('div')
+    group.className = 'tg'
+    group.m = m4id()
+    group.appendChild(im)
+    group.style.width = w + 'px'
+    group.style.height = h + 'px'
+    return [group, w, h]
+}
+function refreshTileImage(group) {
+    for (const im of group.querySelectorAll('img[class~="tile"]')) {
+        let [data, w, h] = renderTileImage(im.tile, canvasScale)
+        im.src = data
+    }
 }
 function rebuildTiles() {
-    let tiles = document.querySelectorAll('#gfx div .tile')
-    for (const view of tiles) {
-        refreshTileImage(view)
+    for (const im of document.querySelectorAll('#gfx img[class~="tile"]')) {
+        let [data, w, h] = renderTileImage(im.tile, canvasScale)
+        im.src = data
+    }
+    for (const im of document.querySelectorAll('#gfx img[class~="mm"]')) {
+        let [data, w, h] = renderMonsterImage(im.tile, canvasScale)
+        im.src = data
     }
 }
 function rotateTile(tile, angle) {
     const side = tile.xs.length
     let xs = tile.xs
-    for (; angle > 0; angle -= 90) {
+    let mons = tile.mons
+    for (angle = (angle % 360 + 360) % 360; angle > 0; angle -= 90) {
         let data = Array()
         for (let y = 0; y < side; ++y) {
             let row = Array()
@@ -322,18 +423,50 @@ function rotateTile(tile, angle) {
             data.push(row)
         }
         xs = data
+        if (mons) {
+            const w = xs[0].length - 1
+            let rotated = new Set()
+            for (const k of mons) {
+                const y = k / 1000 | 0
+                const x = k % 1000
+                rotated.add(x * 1000 + (w - y))
+            }
+            mons = rotated
+        }
     }
-    return {id: tile.id, sig: tile.sig, xs: xs}
+    return {id:tile.id, sig:tile.sig, xs:xs, border:tile.border, mons:mons}
 }
-function flipxTile(tile, angle) {
+function flipxTile(tile) {
     const bound = tile.xs.length - 1
     let xs = tile.xs.map(row => row.map((x, i) => row[bound-i]))
-    return {id: tile.id, sig: tile.sig, xs: xs}
+    let mons = tile.mons
+    if (mons) {
+        const w = xs[0].length - 1
+        let rotated = new Set()
+        for (const k of mons) {
+            const y = k / 1000 | 0
+            const x = k % 1000
+            rotated.add(y * 1000 + (w - x))
+        }
+        mons = rotated
+    }
+    return {id:tile.id, sig:tile.sig, xs:xs, border:tile.border, mons:mons}
 }
 function flipyTile(tile, angle) {
     const bound = tile.xs.length - 1
     let xs = tile.xs.map((row, i) => tile.xs[bound-i])
-    return {id: tile.id, sig: tile.sig, xs: xs}
+    let mons = tile.mons
+    if (mons) {
+        const h = xs.length - 1
+        let rotated = new Set()
+        for (const k of mons) {
+            const y = k / 1000 | 0
+            const x = k % 1000
+            rotated.add((h - y) * 1000 + x)
+        }
+        mons = rotated
+    }
+    return {id:tile.id, sig:tile.sig, xs:xs, border:tile.border, mons:mons}
 }
 function tileTop(tile) { return tile.xs[0] }
 function tileBottom(tile) { return tile.xs[tile.xs.length-1] }
@@ -343,7 +476,7 @@ function parseTile(s) {
     let lines = s.trim().split(/\n+/)
     let id = Number.parseInt(/\d+/.exec(lines[0]))
     let xs = lines.slice(1).map(s => s.split('').map(x => x === '#' ?1:0))
-    let tile = {id, xs}
+    let tile = {id, xs, border:1}
     tile.sig = [
         packnum(tileTop(tile)),
         packnum(reverse(tileTop(tile))),
@@ -372,31 +505,50 @@ function shuffle(a) {
     }
 }
 let cpossible = undefined
-function collidAdd(view) {
+function collidAdd(group) {
     if (!cpossible) {
         cpossible = new Map()
     }
-    for (const s of view.tile.sig) {
-        let ts = cpossible.get(s) || Array()
-        ts.push(view)
-        cpossible.set(s, ts)
+    for (const im of group.querySelectorAll('img')) {
+        for (const s of im.tile.sig) {
+            let ts = cpossible.get(s) || Array()
+            ts.push(im)
+            cpossible.set(s, ts)
+        }
     }
 }
-function collidDet(view) {
-    let known = new Set()
-    for (const x of view.tile.sig.flatMap(s => cpossible.get(s))) {
-        known.add(x)
+function collidRemove(group) {
+    for (const im of group.querySelectorAll('img')) {
+        for (const s of im.tile.sig) {
+            let ts = cpossible.get(s) || Array()
+            ts = ts.filter(x => x !== im)
+            cpossible.set(s, ts)
+        }
     }
-    const mybounds = view.getBoundingClientRect()
+}
+function collidDet(im) {
+    const group = im.closest('div')
+    let known = new Set()
+    for (const x of im.tile.sig.flatMap(s => cpossible.get(s))) {
+        if ((x !== im) && (x.closest('div') !== group)) {
+            known.add(x)
+        }
+    }
+    const mybounds = im.getBoundingClientRect()
     for (const other of known) {
-        if (other === view) { continue }
         const bounds = other.getBoundingClientRect()
         if (collidNear(mybounds, bounds)) {
-            const [sa, sb] = collidSidesNear(view, other, mybounds, bounds)
+            const [sa, sb] = collidSidesNear(im, other, mybounds, bounds)
             if (sa && sb && packnum(sa) == packnum(sb)) {
                 return other
             }
         }
+    }
+}
+function collidDetGroup(group) {
+    for (const im of group.querySelectorAll('img')) {
+        const other = collidDet(im)
+        if (other) { return [im, other] }
     }
 }
 function collidNear(a, b) {
@@ -433,6 +585,8 @@ function collidSidesNear(aview, bview, a, b) {
     return  [va, vb]
 }
 function snapTo(aview, bview, movedX, movedY) {
+    const agroup = aview.closest('div')
+    const bgroup = bview.closest('div')
     const q = 0.2 * 2
     const a = aview.getBoundingClientRect()
     const b = bview.getBoundingClientRect()
@@ -441,46 +595,334 @@ function snapTo(aview, bview, movedX, movedY) {
         const dy = Math.abs(oy - a.top)
         if (dx + dy < a.width * q) {
             if (dx == dy || (dx > dy && Math.sign(movedX) == Math.sign(dx)) || (dx < dy && Math.sign(movedY) == Math.sign(dy))) {
-                const parent = aview.parentNode.getBoundingClientRect()
-                aview.style.left = ox - parent.left + 'px'
-                aview.style.top = oy - parent.top + 'px'
+                const r = agroup.getBoundingClientRect()
+                const parent = agroup.parentNode.getBoundingClientRect()
+                if (m4getra(agroup.m) % 180) {
+                    agroup.style.left = (r.left - parent.left + ox - a.left - (r.bottom - r.top) / 2 + (r.right - r.left) / 2) + 'px'
+                    agroup.style.top = (r.top - parent.top + oy - a.top - (r.right - r.left) / 2 + (r.bottom - r.top) / 2) + 'px'
+                }
+                else {
+                    agroup.style.left = (r.left - parent.left + ox - a.left) + 'px'
+                    agroup.style.top = (r.top - parent.top + oy - a.top) + 'px'
+                }
                 return true
             }
         }
     }
+}
+function mergeGroups(agroup, bgroup) {
+    const alist = agroup.querySelectorAll('img[class~="tile"]')
+    const blist = bgroup.querySelectorAll('img[class~="tile"]')
+    const ablist = [...alist, ...blist]
+    let top = Number.MAX_VALUE
+    let left = Number.MAX_VALUE
+    let right = 0
+    let bottom = 0
+    for (const im of ablist) {
+        const r = im.getBoundingClientRect()
+        top = Math.min(top, r.top)
+        left = Math.min(left, r.left)
+        right = Math.max(right, r.right)
+        bottom = Math.max(bottom, r.bottom)
+    }
+    const parent = agroup.parentNode.getBoundingClientRect()
+    let merged = document.createElement('div')
+    merged.className = 'tg'
+    merged.m = m4id()
+    merged.style.left = (left - parent.left) + 'px'
+    merged.style.top = (top - parent.top) + 'px'
+    merged.style.width = (right - left) + 'px'
+    merged.style.height = (bottom - top) + 'px'
+    for (const im of ablist) {
+        const r = im.getBoundingClientRect()
+        const [om, w, h] = renderTile(im.tile, canvasScale)
+        om.addEventListener('mousedown', tileMouseDown)
+        om.addEventListener('wheel', onMouseWheel)
+        om.style.left = (r.left - left) + 'px'
+        om.style.top = (r.top - top) + 'px'
+        merged.appendChild(om)
+    }
+    collidRemove(agroup)
+    collidRemove(bgroup)
+    agroup.parentNode.appendChild(merged)
+    agroup.parentNode.removeChild(agroup)
+    bgroup.parentNode.removeChild(bgroup)
+    collidAdd(merged)
+    return merged
+}
+function gridSortTiles(group) {
+    function gridsort(a, b) {
+        const ra = a.getBoundingClientRect()
+        const rb = b.getBoundingClientRect()
+        if (Math.abs(ra.top - rb.top) < 0.001) {
+            return Math.sign(ra.left - rb.left)
+        }
+        return Math.sign(ra.top - rb.top)
+    }
+    const alist = [...group.querySelectorAll('img[class~="tile"]')]
+    alist.sort(gridsort)
+    for (const im of alist) {
+        group.appendChild(im)
+    }
+}
+function mergeTiles(group) {
+    let tile = new Array()
+    let top = -1
+    let oy = 0
+    for (const im of group.querySelectorAll('img[class~="tile"]')) {
+        const r = im.getBoundingClientRect()
+        if (r.top != top) {
+            top = r.top
+            oy = tile.length
+        }
+        const xs = im.tile.xs
+        for (const [i, row] of xs.entries()) {
+            if (oy + i >= tile.length) {
+                tile.push(new Array())
+            }
+            let scan = tile[oy + i]
+            scan.push(...row)
+        }
+    }
+    return {id:'', xs:tile, sig:[], m:m4id(), border:0, mons:new Set()}
+}
+function part2TilesGroup(source) {
+    function crop(tile) {
+        let xs = tile.xs
+        xs = xs.slice(1, xs.length-1).map(row => row.slice(1, row.length-1))
+        return {id:tile.id, xs:xs, sig:tile.sig, border:0, mons:tile.mons}
+    }
+    let group = document.createElement('div')
+    group.className = 'tg'
+    const parent = source.getBoundingClientRect()
+    for (const s of source.querySelectorAll('img[class~="tile"]')) {
+        const r = s.getBoundingClientRect()
+        const [im, w, h] = renderTile(crop(s.tile), canvasScale)
+        im.style.left = (r.left - parent.left + canvasScale) + 'px'
+        im.style.top = (r.top - parent.top + canvasScale) + 'px'
+        group.appendChild(im)
+    }
+    group.style.width = source.style.width
+    group.style.height = source.style.height
+    group.style.left = source.style.left
+    group.style.top = source.style.top
+    return group
+}
+function onPackingAnimationEnd(event) {
+    const faded = event.target
+    faded.parentNode.removeChild(faded)
+    const board = document.querySelector('#gfx .brd')
+    const group = board.querySelector('.tg')
+    group.classList.remove('o0', 'o1')
+    const monster = document.querySelector('#gfx .mg')
+    monster.style['z-index'] = 1
+    updateScore()
+}
+function onFadingAnimationEnd(event) {
+    const faded = event.target
+    faded.parentNode.removeChild(faded)
+    animateTilePacking()
+}
+function animateTilePacking() {
+    const board = document.querySelector('#gfx .brd')
+    const group = board.querySelector('.tg')
+    gridSortTiles(group)
+    const [merged, mw, mh] = renderSingle(mergeTiles(group), canvasScale)
+    const r = group.getBoundingClientRect()
+    const parent = board.getBoundingClientRect()
+    const ox = (r.width - mw) / 2
+    const oy = (r.height - mh) / 2
+    merged.style.left = (r.left - parent.left + ox) + 'px'
+    merged.style.top = (r.top - parent.top + oy) + 'px'
+    merged.classList.add('o0')
+    board.appendChild(merged)
+    board.appendChild(group)
+    {
+        group.addEventListener('animationend', onPackingAnimationEnd)
+        group.classList.add('fade2')
+        let top = Number.MIN_VALUE
+        let y = oy
+        let x = ox
+        let dy = 0
+        for (const im of group.querySelectorAll('img[class~="tile"]')) {
+            const r = im.getBoundingClientRect()
+            if (r.top != top) {
+                top = r.top
+                y += dy
+                dy = r.height
+                x = ox
+            }
+            im.classList.add('anm')
+            im.style.left = x + 'px'
+            im.style.top = y + 'px'
+            x += r.width
+        }
+        merged.classList.add('o1')
+    }
+}
+function checkStatePart2() {
+    const alist = document.querySelectorAll('#gfx div[class~="tg"]')
+    if (alist.length == 1) {
+        gamePhase = 2
+        const board = document.querySelector('#gfx .brd')
+        const score = board.querySelector('.score')
+        score.style.display = 'block'
+        const group = alist[0]
+        let cropped = part2TilesGroup(group)
+        board.appendChild(cropped)
+        board.appendChild(group)
+        group.addEventListener('animationend', onFadingAnimationEnd)
+        group.classList.add('fadeo')
+    }
+}
+function updateScore() {
+    const tile = document.querySelector('#gfx div[class~="tg"] img').tile
+    const monsterPixels = tile.mons || new Set()
+    const score = tile.xs.reduce((a, row) => a + row.reduce((b, x) => b + x), 0) - monsterPixels.size
+    const el = document.querySelector('#gfx .score span')
+    el.textContent = score
+}
+function parseMonster(s) {
+    let lines = s.trim().split(/\n+/)
+    let xs = lines.map(s => s.split('').map(x => x === '#' ?1:0))
+    let probe = xs.flatMap((row, y) => row.flatMap((c, x) => c ? [[y,x]] : []))
+    return {id:'', xs:xs, sig:[], border:0, probe:probe}
+}
+function renderMonsterImage(tile, scale) {
+    const [w, h] = [tile.xs[0].length, tile.xs.length]
+    let canvas = document.createElement('canvas')
+    let gx = canvas.getContext('2d')
+    gx.canvas.width = w * scale
+    gx.canvas.height = h * scale
+    gx.scale(scale, scale)
+    gx.beginPath()
+    gx.moveTo(0, 1)
+    for (const [x, y] of [[1,0], [w,0], [w,h], [0,h]]) {
+        gx.lineTo(x, y)
+    }
+    gx.closePath()
+    gx.clip()
+    const theme = {
+        opaque: 'rgba(255,166,47,0.93)',
+        transp: 'rgba(255,232,124,0)',
+    }
+    for (const [y, row] of tile.xs.entries()) {
+        for (const [x, c] of row.entries()) {
+            const color = c ? theme.transp : theme.opaque
+            gx.fillStyle = color
+            gx.fillRect(x, y, 1, 1)
+        }
+    }
+    return [canvas.toDataURL(), w * scale, h * scale]
+}
+function renderMonsterMask(tile, scale) {
+    const [data, w, h] = renderMonsterImage(tile, scale)
+    let im = new Image()
+    im.src = data
+    im.tile = tile
+    im.className = 'mm'
+    im.setAttribute('draggable', false)
+    im.addEventListener('mousedown', monsterMouseDown)
+    let group = document.createElement('div')
+    group.className = 'mg'
+    group.appendChild(im)
+    group.style.left = 40 + 'px'
+    group.style.top = 20 + 'px'
+    return group
+}
+function probeMonster(mask, group) {
+    const ra = mask.getBoundingClientRect()
+    const rb = group.getBoundingClientRect()
+    const px = (ra.left - rb.left) / canvasScale
+    const py = (ra.top - rb.top) / canvasScale
+    const ox = Math.round(px)
+    const oy = Math.round(py)
+    const q = 0.25
+    if (Math.abs(ox - px) > q || Math.abs(oy - py) > q) { return }
+    const probe = mask.querySelector('img').tile.probe
+    const tile = group.querySelector('img[class~="tile"]').tile
+    const monsterPixels = tile.mons || new Set()
+    for (const [dy, dx] of probe) {
+        const k = (oy + dy) * 1000 + (ox + dx)
+        if (monsterPixels.has(k)) { return }
+        const row = tile.xs[oy + dy]
+        if (!row) { return }
+        const c = row[ox + dx]
+        if (!c) { return }
+    }
+    return [oy, ox]
+}
+function untransTile(tile, q) {
+    const [sx, sy, ra] = q
+    if (ra) { tile = rotateTile(tile, -ra) }
+    if (sx != 1) { tile = flipxTile(tile) }
+    if (sy != 1) { tile = flipyTile(tile) }
+    return tile
+}
+function highlightMonster(mask, group, pos) {
+    const probe = mask.querySelector('img').tile.probe
+    const im = group.querySelector('img[class~="tile"]')
+    const monsterPixels = im.tile.mons || new Set()
+    const [oy, ox] = pos
+    for (const [dy, dx] of probe) {
+        const k = (oy + dy) * 1000 + (ox + dx)
+        monsterPixels.add(k)
+    }
+    im.tile.mons = monsterPixels
+    updateScore()
+    const [data, w, h] = renderTileImage(untransTile(im.tile, group.m), canvasScale)
+    im.src = data
 }
 function startGame() {
     document.querySelector('.fm button').blur()
     let input = document.getElementById('input').value
     let tiles = input.trim().split(/\n\n/).map(parseTile)
     shuffle(tiles)
+    gamePhase = 1
+    const score = document.querySelector('#gfx .score')
+    if (score) {
+        score.style.display = 'none'
+    }
     const scale = canvasScale
     const side = Math.sqrt(tiles.length) | 0
     cpossible = undefined
 
-    const solution0 = 0
+    const mons = '\
+......................\n\
+...................#..\n\
+.#....##....##....###.\n\
+..#..#..#..#..#..#....\n\
+......................'
+    const monster = renderMonsterMask(parseMonster(mons), scale)
 
     let inner = document.createElement('div')
-    const [inx, iny] = [side * scale * 10, side * scale]
+    {
+        let score = document.createElement('div')
+        score.classList.add('score')
+        let legend = new Image()
+        const [data, w, h] = renderTileImage({xs:[[1]]}, scale)
+        legend.src = data
+        score.appendChild(legend)
+        let l = document.createElement('span')
+        score.appendChild(l)
+        inner.appendChild(score)
+    }
+    inner.appendChild(monster)
+    const spreadx = side * scale * 10
+    const spready = side * scale
     for (const tile of tiles) {
-        let view = renderTile(tile, scale)
-        collidAdd(view)
-        inner.appendChild(view)
+        const [group, w, h] = renderSingle(tile, scale)
+        collidAdd(group)
+        inner.appendChild(group)
         let x, y
-        if (solution0) {
-            const i = solution0.indexOf(tile.id)
-            x = (i % side) * (tile.xs[0].length + 1) * scale
-            y = (i / side | 0) * (tile.xs.length + 1) * scale
-        }
-        else {
-            [y, x] = [Math.random()*iny|0, Math.random()*inx|0]
-        }
-        view.style.left = x + 'px'
-        view.style.top = y + 'px'
+        [y, x] = [Math.random()*spready|0, Math.random()*spreadx|0]
+        group.style.left = x + 'px'
+        group.style.top = y + 'px'
     }
 
     inner.style.position = 'relative'
     inner.style.left = '2em'
+    inner.classList.add('brd')
     let board = document.getElementById('gfx')
     let prev = board.querySelector('div')
     if (prev) {
@@ -489,7 +931,6 @@ function startGame() {
     else {
         board.appendChild(inner)
     }
-
 }
 function setupApp() {
     document.querySelector('.fm button').addEventListener('click', startGame)
