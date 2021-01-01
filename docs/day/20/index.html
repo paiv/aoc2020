@@ -486,7 +486,7 @@ function parseTile(s) {
         packnum(reverse(tileLeft(tile))),
         packnum(tileRight(tile)),
         packnum(reverse(tileRight(tile))),
-    ]
+    ].sort((x,y) => x - y)
     return tile
 }
 function reverse(a) {
@@ -658,7 +658,7 @@ function gridSortTiles(group) {
     function gridsort(a, b) {
         const ra = a.getBoundingClientRect()
         const rb = b.getBoundingClientRect()
-        if (Math.abs(ra.top - rb.top) < 0.001) {
+        if (Math.abs(ra.top - rb.top) < canvasScale) {
             return Math.sign(ra.left - rb.left)
         }
         return Math.sign(ra.top - rb.top)
@@ -675,7 +675,7 @@ function mergeTiles(group) {
     let oy = 0
     for (const im of group.querySelectorAll('img[class~="tile"]')) {
         const r = im.getBoundingClientRect()
-        if (Math.abs(r.top - top) > 0.001) {
+        if (Math.abs(r.top - top) > canvasScale) {
             top = r.top
             oy = tile.length
         }
@@ -750,7 +750,7 @@ function animateTilePacking() {
         let dy = 0
         for (const im of group.querySelectorAll('img[class~="tile"]')) {
             const r = im.getBoundingClientRect()
-            if (Math.abs(r.top - top) > 0.001) {
+            if (Math.abs(r.top - top) > canvasScale) {
                 top = r.top
                 y += dy
                 dy = r.height
