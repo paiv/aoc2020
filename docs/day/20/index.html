@@ -587,6 +587,11 @@ function collidSidesNear(aview, bview, a, b) {
 function snapTo(aview, bview, movedX, movedY) {
     const agroup = aview.closest('div')
     const bgroup = bview.closest('div')
+    const r = agroup.getBoundingClientRect()
+    const fullSide = canvasScale * aview.tile.xs.length
+    if (r.width % fullSide || r.height % fullSide) {
+        return
+    }
     const q = 0.2 * 2
     const a = aview.getBoundingClientRect()
     const b = bview.getBoundingClientRect()
@@ -595,7 +600,6 @@ function snapTo(aview, bview, movedX, movedY) {
         const dy = Math.abs(oy - a.top)
         if (dx + dy < a.width * q) {
             if (dx == dy || (dx > dy && Math.sign(movedX) == Math.sign(dx)) || (dx < dy && Math.sign(movedY) == Math.sign(dy))) {
-                const r = agroup.getBoundingClientRect()
                 const parent = agroup.parentNode.getBoundingClientRect()
                 if (m4getra(agroup.m) % 180) {
                     agroup.style.left = (r.left - parent.left + ox - a.left - (r.bottom - r.top) / 2 + (r.right - r.left) / 2) + 'px'
@@ -914,8 +918,7 @@ function startGame() {
         const [group, w, h] = renderSingle(tile, scale)
         collidAdd(group)
         inner.appendChild(group)
-        let x, y
-        [y, x] = [Math.random()*spready|0, Math.random()*spreadx|0]
+        const [y, x] = [Math.random()*spready|0, Math.random()*spreadx|0]
         group.style.left = x + 'px'
         group.style.top = y + 'px'
     }
