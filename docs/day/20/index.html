@@ -675,7 +675,7 @@ function mergeTiles(group) {
     let oy = 0
     for (const im of group.querySelectorAll('img[class~="tile"]')) {
         const r = im.getBoundingClientRect()
-        if (r.top != top) {
+        if (Math.abs(r.top - top) > 0.001) {
             top = r.top
             oy = tile.length
         }
@@ -750,7 +750,7 @@ function animateTilePacking() {
         let dy = 0
         for (const im of group.querySelectorAll('img[class~="tile"]')) {
             const r = im.getBoundingClientRect()
-            if (r.top != top) {
+            if (Math.abs(r.top - top) > 0.001) {
                 top = r.top
                 y += dy
                 dy = r.height
