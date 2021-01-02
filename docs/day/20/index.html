@@ -486,7 +486,7 @@ function parseTile(s) {
         packnum(reverse(tileLeft(tile))),
         packnum(tileRight(tile)),
         packnum(reverse(tileRight(tile))),
-    ].sort((x,y) => x - y)
+    ]
     return tile
 }
 function reverse(a) {
@@ -595,11 +595,19 @@ function snapTo(aview, bview, movedX, movedY) {
     const q = 0.2 * 2
     const a = aview.getBoundingClientRect()
     const b = bview.getBoundingClientRect()
-    for (const [ox, oy] of [[b.left-a.width, b.top], [b.left, b.top-a.height], [b.left+b.width, b.top], [b.left, b.top+b.height]]) {
+    for (const [i, [ox, oy]] of [[b.left-a.width, b.top], [b.left, b.top-a.height], [b.left+b.width, b.top], [b.left, b.top+b.height]].entries()) {
         const dx = Math.abs(ox - a.left)
         const dy = Math.abs(oy - a.top)
         if (dx + dy < a.width * q) {
             if (dx == dy || (dx > dy && Math.sign(movedX) == Math.sign(dx)) || (dx < dy && Math.sign(movedY) == Math.sign(dy))) {
+                let aside, bside
+                switch (i) {
+                    case 0: aside = tileRight(aview.tile); bside = tileLeft(bview.tile); break
+                    case 1: aside = tileBottom(aview.tile); bside = tileTop(bview.tile); break
+                    case 2: aside = tileLeft(aview.tile); bside = tileRight(bview.tile); break
+                    case 3: aside = tileTop(aview.tile); bside = tileBottom(bview.tile); break
+                }
+                if (!aside.every((x,i) => x === bside[i])) { return }
                 const parent = agroup.parentNode.getBoundingClientRect()
                 if (m4getra(agroup.m) % 180) {
                     agroup.style.left = (r.left - parent.left + ox - a.left - (r.bottom - r.top) / 2 + (r.right - r.left) / 2) + 'px'
