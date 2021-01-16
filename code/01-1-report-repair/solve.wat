@@ -1,0 +1,28 @@
+(module
+(memory (import "js" "mem") 1)
+(func (export "solve") (param $len i32) (result i32)
+    (local $end i32)
+    (local $x i32)
+    (local $y i32)
+    (local.set $end (i32.mul (local.get $len) (i32.const 4)))
+    (local.set $x (i32.const 0))
+    (block $xbreak (loop $xloop
+        (br_if $xbreak (i32.eq (local.get $x) (local.get $end)))
+        (local.set $y (i32.add (local.get $x) (i32.const 4)))
+        (block $ybreak (loop $yloop
+            (br_if $ybreak (i32.eq (local.get $y) (local.get $end)))
+            (if (i32.eq (i32.add (i32.load (local.get $x)) (i32.load (local.get $y))) (i32.const 2020))
+                (then
+                    (i32.mul (i32.load (local.get $x)) (i32.load (local.get $y)))
+                    (return )
+                )
+            )
+            (local.set $y (i32.add (local.get $y) (i32.const 4)))
+            (br $yloop)
+        ))
+        (local.set $x (i32.add (local.get $x) (i32.const 4)))
+        (br $xloop)
+    ))
+    (i32.const -1)
+)
+)

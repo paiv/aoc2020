@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Day 1: Report Repair</title>
+
+<style media="screen">
+:root {--bg:#fff; --fg:#000;}
+@media (prefers-color-scheme:dark) {:root {--bg:#202124;--fg:#f1f3f4;}}
+body, body * {background:var(--bg); color:var(--fg);}
+textarea {width: 8em; height: 40em;}
+.flx {display:flex;}
+.fm button {margin-left: 1em; margin-top: 2em;}
+#gfx {flex:8; margin-left:1em; border:1px solid gray;
+  font-family:monospace; font-size:larger; white-space:nowrap; overflow:scroll;}
+</style>
+</head>
+<body>
+
+<div class="flx">
+
+<div>
+    <textarea id="input">1721
+979
+366
+299
+675
+1456
+</textarea>
+</div>
+
+<div class="fm">
+    <button type="button" name="button" disabled>Solve</button>
+</div>
+
+<div id="gfx">
+</div>
+
+</div>
+
+<script type="text/javascript">
+function solve(image, n) {
+    const ans = image.exports.solve(n)
+    document.getElementById('gfx').textContent = ans
+}
+let solverModule = undefined
+function runSolver() {
+    let input = document.getElementById('input').value
+    input = input.trim().split(/\s+/).map(s => Number.parseInt(s))
+    const memory = new WebAssembly.Memory({initial:1})
+    let xs = new Uint32Array(memory.buffer)
+    input.forEach((x, i) => {
+        xs[i] = x
+    })
+    WebAssembly.instantiate(solverModule, {js: {mem: memory}})
+        .then(im => solve(im, input.length))
+}
+function loadModule(m) {
+    solverModule = m
+    const btn = document.querySelector('.fm button')
+    btn.removeAttribute('disabled')
+}
+function setupApp() {
+    document.querySelector('.fm button').addEventListener('click', runSolver)
+    WebAssembly.compileStreaming(fetch('solve.wasm'))
+        .then(loadModule)
+}
+window.addEventListener('DOMContentLoaded', setupApp)
+</script>
+</body>
+</html>
